@@ -1,0 +1,1150 @@
+[
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Ошибка: Yahoo Finance не вернул данные для GC=F"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Gold OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T17:54:58.114968"
+  },
+  {
+    "signal": "UP",
+    "confidence": 66,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "Импульс положительный"
+    ],
+    "state": "bullish",
+    "entry_price": 5061.7001953125,
+    "exit_price": 71824.22,
+    "result": "WIN",
+    "symbol": "Gold OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T17:55:05.271880"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Ошибка: Yahoo Finance не вернул данные для GC=F"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Gold OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T17:55:10.445388"
+  },
+  {
+    "signal": "UP",
+    "confidence": 66,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "Импульс положительный"
+    ],
+    "state": "bullish",
+    "entry_price": 71849.13,
+    "exit_price": 71824.22,
+    "result": "LOSS",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T17:56:14.522654"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 1.1423349380493164,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "EUR/USD OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T18:04:35.552228"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 1.1423349380493164,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "EUR/USD OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T18:04:43.961394"
+  },
+  {
+    "signal": "UP",
+    "confidence": 76,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "Импульс положительный"
+    ],
+    "state": "bullish",
+    "entry_price": 71824.22,
+    "exit_price": 71742.33,
+    "result": "LOSS",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T18:05:04.263720"
+  },
+  {
+    "signal": "UP",
+    "confidence": 66,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (59)"
+    ],
+    "state": "bullish",
+    "entry_price": 71790.29,
+    "exit_price": 71742.33,
+    "result": "LOSS",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T18:06:46.785054"
+  },
+  {
+    "signal": "UP",
+    "confidence": 66,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "Импульс положительный"
+    ],
+    "state": "bullish",
+    "entry_price": 71808.75,
+    "exit_price": 71742.33,
+    "result": "LOSS",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T18:07:36.808133"
+  },
+  {
+    "signal": "UP",
+    "confidence": 66,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (60)"
+    ],
+    "state": "bullish",
+    "entry_price": 71802.79,
+    "exit_price": 71742.33,
+    "result": "LOSS",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "15s",
+    "timestamp": "2026-03-15T18:07:55.860435"
+  },
+  {
+    "signal": "UP",
+    "confidence": 66,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (60)"
+    ],
+    "state": "bullish",
+    "entry_price": 71797.69,
+    "exit_price": 71742.33,
+    "result": "LOSS",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "15s",
+    "timestamp": "2026-03-15T18:08:21.013360"
+  },
+  {
+    "signal": "UP",
+    "confidence": 66,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "Импульс положительный"
+    ],
+    "state": "bullish",
+    "entry_price": 2110.59,
+    "exit_price": 71742.33,
+    "result": "WIN",
+    "symbol": "Ethereum OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T18:08:49.617042"
+  },
+  {
+    "signal": "UP",
+    "confidence": 80,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "Импульс положительный",
+      "MACD подтверждает рост",
+      "Последняя свеча бычья"
+    ],
+    "state": "bullish",
+    "entry_price": 5061.7001953125,
+    "exit_price": 71742.33,
+    "result": "WIN",
+    "symbol": "Gold OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T18:15:52.648515"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок закрыт — форекс работает пн-пт 08:00-17:00 UTC"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Gold OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T18:21:00.975249"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71742.34,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T18:21:45.063473"
+  },
+  {
+    "signal": "UP",
+    "confidence": 60,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (60)",
+      "Последняя свеча бычья",
+      "Тренд M5 подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 71742.33,
+    "exit_price": 71754.78,
+    "result": "WIN",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T18:22:02.938427"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок закрыт — форекс работает пн-пт 08:00-17:00 UTC"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Gold OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T18:22:30.656093"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок закрыт — форекс работает пн-пт 08:00-17:00 UTC"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "CAD/CHF OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T18:30:16.552583"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Ошибка: 'BBU_20_2.0'"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T18:30:45.656722"
+  },
+  {
+    "signal": "UP",
+    "confidence": 85,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (60)",
+      "Импульс положительный",
+      "MACD подтверждает рост",
+      "Свеча бычья",
+      "Bollinger: зона роста",
+      "Тренд старшего ТФ подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 71760.44,
+    "exit_price": 71509.85,
+    "result": "LOSS",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T18:36:47.264639"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок закрыт — форекс работает пн-пт 08:00-17:00 UTC"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Gold OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T19:49:57.152764"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71505.99,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:50:22.804343"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71505.99,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:50:32.296958"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71505.99,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:50:39.161804"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71509.86,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:50:55.660560"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71509.86,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:51:13.575021"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71510.93,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:51:33.593505"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 71510.92,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T19:51:51.426645"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 71510.92,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T19:52:00.710007"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 71510.92,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T19:52:06.936989"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71510.93,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:52:23.004572"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 1.419,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Polkadot OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T19:52:51.019648"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 1.419,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Polkadot OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T19:53:09.188992"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T19:53:25.493670"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T19:53:32.055670"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.2,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:53:47.672919"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.2,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:53:53.268747"
+  },
+  {
+    "signal": "UP",
+    "confidence": 57,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (52)",
+      "Импульс положительный",
+      "Bollinger: зона роста",
+      "Тренд старшего ТФ подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 1.305,
+    "exit_price": 2113.15,
+    "result": "WIN",
+    "symbol": "Toncoin OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:54:13.280260"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 0.2636,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Cardano OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:54:45.080136"
+  },
+  {
+    "signal": "UP",
+    "confidence": 57,
+    "reasons": [
+      "RSI в бычьей зоне (48)",
+      "Импульс положительный",
+      "Свеча бычья",
+      "Bollinger: зона роста",
+      "Тренд старшего ТФ подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 88.1,
+    "exit_price": 2113.15,
+    "result": "WIN",
+    "symbol": "Solana OTC",
+    "timeframe": "M5",
+    "timestamp": "2026-03-15T19:55:06.371958"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 71523.85,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T19:55:36.781929"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 71523.85,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T19:55:43.051232"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71513.97,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T19:56:02.769482"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 71513.97,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T19:56:14.991199"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 88.14,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Solana OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T19:56:35.136322"
+  },
+  {
+    "signal": "UP",
+    "confidence": 57,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (54)",
+      "Импульс положительный",
+      "Bollinger: зона роста",
+      "Тренд старшего ТФ подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 2112.85,
+    "exit_price": 55.16,
+    "result": "LOSS",
+    "symbol": "Ethereum OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:10:24.896093"
+  },
+  {
+    "signal": "UP",
+    "confidence": 71,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (56)",
+      "Импульс положительный",
+      "Свеча бычья",
+      "Bollinger: зона роста",
+      "Тренд старшего ТФ подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 2113.24,
+    "exit_price": 55.16,
+    "result": "LOSS",
+    "symbol": "Ethereum OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:10:49.544999"
+  },
+  {
+    "signal": "UP",
+    "confidence": 57,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (49)",
+      "Свеча бычья",
+      "Bollinger: зона роста",
+      "Тренд старшего ТФ подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 2111.98,
+    "exit_price": 55.12,
+    "result": "LOSS",
+    "symbol": "Ethereum OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:14:41.638807"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок закрыт — форекс работает пн-пт 08:00-17:00 UTC"
+    ],
+    "state": "neutral",
+    "entry_price": null,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "EUR/USD OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:15:28.466465"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.14,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:16:10.510449"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.17,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:16:41.365758"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.16,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:17:06.364016"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.16,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:17:37.944641"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 55.11,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:17:53.026111"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 95,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "RSI в медвежьей зоне (43)",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Свеча медвежья",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 55.12,
+    "exit_price": 71492.69,
+    "result": "LOSS",
+    "symbol": "Litecoin OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T20:18:19.232480"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 71,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Свеча медвежья",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 55.1,
+    "exit_price": 9.19,
+    "result": "WIN",
+    "symbol": "Litecoin OTC",
+    "timeframe": "15s",
+    "timestamp": "2026-03-15T20:21:20.678274"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 71,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Свеча медвежья",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 55.1,
+    "exit_price": 9.19,
+    "result": "WIN",
+    "symbol": "Litecoin OTC",
+    "timeframe": "15s",
+    "timestamp": "2026-03-15T20:21:36.119513"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 71,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "RSI в медвежьей зоне (37)",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 55.12,
+    "exit_price": 9.19,
+    "result": "WIN",
+    "symbol": "Litecoin OTC",
+    "timeframe": "15s",
+    "timestamp": "2026-03-15T20:21:52.070931"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 57,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 55.11,
+    "exit_price": 9.17,
+    "result": "WIN",
+    "symbol": "Litecoin OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:22:29.477293"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 71504.58,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:25:28.224872"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Рынок в боковике"
+    ],
+    "state": "neutral",
+    "entry_price": 71477.76,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:25:53.149517"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:26:15.063009"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-15T20:26:44.601852"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:27:04.107404"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:27:11.368144"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:27:21.335428"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.17,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:27:42.885348"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.17,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:27:51.333277"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.17,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:28:01.753267"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.18,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:28:20.959886"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.18,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:28:31.841752"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.18,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:28:41.630885"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:29:01.086288"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:29:12.327570"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:29:21.840485"
+  },
+  {
+    "signal": "NO SIGNAL",
+    "confidence": 0,
+    "reasons": [
+      "Недостаточно подтверждений"
+    ],
+    "state": "neutral",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": "skip",
+    "symbol": "Chainlink OTC",
+    "timeframe": "30s",
+    "timestamp": "2026-03-15T20:29:40.935210"
+  },
+  {
+    "signal": "UP",
+    "confidence": 57,
+    "reasons": [
+      "Быстрая EMA выше медленной",
+      "RSI в бычьей зоне (52)",
+      "Свеча бычья",
+      "Bollinger: зона роста",
+      "Тренд старшего ТФ подтверждает рост"
+    ],
+    "state": "bullish",
+    "entry_price": 9.19,
+    "exit_price": null,
+    "result": null,
+    "symbol": "Chainlink OTC",
+    "timeframe": "M3",
+    "timestamp": "2026-03-15T20:30:00.970850"
+  }
+]
