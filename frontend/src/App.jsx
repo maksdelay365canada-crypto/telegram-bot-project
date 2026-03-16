@@ -1,6 +1,8 @@
 import "./App.css";
 import { useState, useEffect, useRef } from "react";
 
+const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 export default function App() {
   const [signalData, setSignalData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -98,7 +100,7 @@ export default function App() {
     loadingRef.current = true;
     setLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/signal", {
+      const response = await fetch(`${API}/signal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, timeframe, mode }),
@@ -131,7 +133,7 @@ export default function App() {
     setScanLoading(true);
     setScanData(null);
     try {
-      const response = await fetch("http://127.0.0.1:8000/scan", {
+      const response = await fetch(`${API}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, timeframe: "M1", mode }),
@@ -157,36 +159,34 @@ export default function App() {
   }
 
   useEffect(() => { if (autoRunning) stopAuto(); }, [symbol, timeframe, mode]);
-  useEffect(() => {// Загружаем историю и Win Rate при старте
-useEffect(() => {
-  fetch("http://127.0.0.1:8000/history")
-    .then((r) => r.json())
-    .then((data) => {
-      if (data.history && data.history.length > 0) {
-        setHistory(
-          data.history
-            .filter((h) => h.signal !== "NO SIGNAL")
-            .slice(-10)
-            .reverse()
-            .map((h) => ({
-              signal:     h.signal,
-              confidence: h.confidence,
-              symbol:     h.symbol,
-              timeframe:  h.timeframe,
-              time:       new Date(h.timestamp).toLocaleTimeString("ru-RU"),
-            }))
-        );
-        setSignalCount(data.total || 0);
-        // Обновляем Win Rate
-        if (data.win_rate != null) {
-          setSignalData((prev) =>
-            prev ? { ...prev, win_rate: data.win_rate } : { win_rate: data.win_rate }
+
+  useEffect(() => {
+    fetch(`${API}/history`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.history && data.history.length > 0) {
+          setHistory(
+            data.history
+              .filter((h) => h.signal !== "NO SIGNAL")
+              .slice(-10)
+              .reverse()
+              .map((h) => ({
+                signal:     h.signal,
+                confidence: h.confidence,
+                symbol:     h.symbol,
+                timeframe:  h.timeframe,
+                time:       new Date(h.timestamp).toLocaleTimeString("ru-RU"),
+              }))
           );
+          setSignalCount(data.total || 0);
+          if (data.win_rate != null) {
+            setSignalData((prev) =>
+              prev ? { ...prev, win_rate: data.win_rate } : { win_rate: data.win_rate }
+            );
+          }
         }
-      }
-    })
-    .catch(() => {});
-}, []);
+      })
+      .catch(() => {});
 
     return () => {
       clearInterval(intervalRef.current);
@@ -204,7 +204,6 @@ useEffect(() => {
     <div className="app">
       <div className="phone-shell">
 
-        {/* Шапка */}
         <div className="top-card">
           <div>
             <div className="asset-title">{symbol}</div>
@@ -216,7 +215,6 @@ useEffect(() => {
           <div className="badge">{autoRunning ? "🔍 Ищу..." : "Готов"}</div>
         </div>
 
-        {/* Статистика */}
         <div className="stats-card">
           <div className="stat-item">
             <span>Win Rate</span>
@@ -236,7 +234,6 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Актив — общий для обоих вкладок */}
         <div className="card">
           <label className="label">Актив</label>
           <select className="input" value={symbol}
@@ -247,28 +244,21 @@ useEffect(() => {
           </select>
         </div>
 
-        {/* Вкладки */}
         <div style={{ display: "flex", gap: "8px", margin: "4px 0 8px" }}>
           <button onClick={() => setActiveTab("manual")} style={{
             flex: 1, padding: "10px", borderRadius: "10px", border: "none",
             background: activeTab === "manual" ? "var(--primary,#3b82f6)" : "var(--card-bg,#1e2435)",
             color: "#fff", fontWeight: "600", cursor: "pointer", fontSize: "13px",
-          }}>
-            ручной
-          </button>
+          }}>ручной</button>
           <button onClick={() => setActiveTab("scanner")} style={{
             flex: 1, padding: "10px", borderRadius: "10px", border: "none",
             background: activeTab === "scanner" ? "var(--primary,#3b82f6)" : "var(--card-bg,#1e2435)",
             color: "#fff", fontWeight: "600", cursor: "pointer", fontSize: "13px",
-          }}>
-            🤖 AI сканер
-          </button>
+          }}>🤖 AI сканер</button>
         </div>
 
-        {/* РУЧНОЙ РЕЖИМ */}
         {activeTab === "manual" && (
           <>
-            {/* Таймфрейм */}
             <div className="card">
               <label className="label">Таймфрейм</label>
               <div className="timeframe-row">
@@ -280,7 +270,6 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* Режим */}
             <div className="mode-card">
               {modes.map((item) => (
                 <button key={item}
@@ -289,7 +278,6 @@ useEffect(() => {
               ))}
             </div>
 
-            {/* Автоанализ */}
             <div className="card">
               <label className="label">Интервал автоанализа</label>
               <div className="timeframe-row" style={{ marginBottom: "10px" }}>
@@ -303,9 +291,7 @@ useEffect(() => {
               <button className="main-button"
                 style={{ background: autoRunning ? "#e53e3e" : undefined }}
                 onClick={autoRunning ? stopAuto : startAuto}>
-                {autoRunning
-                  ? `⏹ СТОП (через ${countdown} сек)`
-                  : "🔍 ИСКАТЬ СИГНАЛ АВТО"}
+                {autoRunning ? `⏹ СТОП (через ${countdown} сек)` : "🔍 ИСКАТЬ СИГНАЛ АВТО"}
               </button>
             </div>
 
@@ -321,7 +307,6 @@ useEffect(() => {
               {loading ? "АНАЛИЗ..." : "ПОЛУЧИТЬ СИГНАЛ"}
             </button>
 
-            {/* Результат */}
             <div className="result-card">
               <div className="result-header">
                 <span>Результат</span>
@@ -375,7 +360,6 @@ useEffect(() => {
           </>
         )}
 
-        {/* AI СКАНЕР */}
         {activeTab === "scanner" && (
           <>
             <div className="ready-card">
@@ -458,7 +442,6 @@ useEffect(() => {
           </>
         )}
 
-        {/* История */}
         <div className="result-card">
           <div className="result-header"
             onClick={() => setHistoryOpen((prev) => !prev)}
