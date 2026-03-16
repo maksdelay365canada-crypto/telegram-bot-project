@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import pandas_ta as ta
 import ccxt
-import yfinance as yf
+from tvdatafeed import TvDatafeed, Interval
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,101 +22,95 @@ app.add_middleware(
 )
 
 ASSET_CONFIG = {
-    "Bitcoin OTC":                  {"source": "binance", "ticker": "BTC/USDT"},
-    "Bitcoin ETF OTC":              {"source": "binance", "ticker": "BTC/USDT"},
-    "Ethereum OTC":                 {"source": "binance", "ticker": "ETH/USDT"},
-    "Litecoin OTC":                 {"source": "binance", "ticker": "LTC/USDT"},
-    "Solana OTC":                   {"source": "binance", "ticker": "SOL/USDT"},
-    "Cardano OTC":                  {"source": "binance", "ticker": "ADA/USDT"},
-    "BNB OTC":                      {"source": "binance", "ticker": "BNB/USDT"},
-    "Dogecoin OTC":                 {"source": "binance", "ticker": "DOGE/USDT"},
-    "Avalanche OTC":                {"source": "binance", "ticker": "AVAX/USDT"},
-    "TRON OTC":                     {"source": "binance", "ticker": "TRX/USDT"},
-    "Chainlink OTC":                {"source": "binance", "ticker": "LINK/USDT"},
-    "Polkadot OTC":                 {"source": "binance", "ticker": "DOT/USDT"},
-    "Polygon OTC":                  {"source": "binance", "ticker": "MATIC/USDT"},
-    "Toncoin OTC":                  {"source": "binance", "ticker": "TON/USDT"},
-    "EUR/USD OTC":                  {"source": "yahoo", "ticker": "EURUSD=X"},
-    "GBP/USD OTC":                  {"source": "yahoo", "ticker": "GBPUSD=X"},
-    "AUD/USD OTC":                  {"source": "yahoo", "ticker": "AUDUSD=X"},
-    "USD/JPY OTC":                  {"source": "yahoo", "ticker": "USDJPY=X"},
-    "USD/CAD OTC":                  {"source": "yahoo", "ticker": "USDCAD=X"},
-    "USD/CHF OTC":                  {"source": "yahoo", "ticker": "USDCHF=X"},
-    "NZD/USD OTC":                  {"source": "yahoo", "ticker": "NZDUSD=X"},
-    "EUR/GBP OTC":                  {"source": "yahoo", "ticker": "EURGBP=X"},
-    "EUR/JPY OTC":                  {"source": "yahoo", "ticker": "EURJPY=X"},
-    "GBP/JPY OTC":                  {"source": "yahoo", "ticker": "GBPJPY=X"},
-    "AUD/JPY OTC":                  {"source": "yahoo", "ticker": "AUDJPY=X"},
-    "EUR/CHF OTC":                  {"source": "yahoo", "ticker": "EURCHF=X"},
-    "USD/RUB OTC":                  {"source": "yahoo", "ticker": "USDRUB=X"},
-    "EUR/RUB OTC":                  {"source": "yahoo", "ticker": "EURRUB=X"},
-    "USD/MXN OTC":                  {"source": "yahoo", "ticker": "USDMXN=X"},
-    "USD/BRL OTC":                  {"source": "yahoo", "ticker": "USDBRL=X"},
-    "USD/INR OTC":                  {"source": "yahoo", "ticker": "USDINR=X"},
-    "USD/CNH OTC":                  {"source": "yahoo", "ticker": "USDCNH=X"},
-    "AUD/CAD OTC":                  {"source": "yahoo", "ticker": "AUDCAD=X"},
-    "AUD/CHF OTC":                  {"source": "yahoo", "ticker": "AUDCHF=X"},
-    "CAD/CHF OTC":                  {"source": "yahoo", "ticker": "CADCHF=X"},
-    "CAD/JPY OTC":                  {"source": "yahoo", "ticker": "CADJPY=X"},
-    "CHF/JPY OTC":                  {"source": "yahoo", "ticker": "CHFJPY=X"},
-    "AUD/NZD OTC":                  {"source": "yahoo", "ticker": "AUDNZD=X"},
-    "NZD/JPY OTC":                  {"source": "yahoo", "ticker": "NZDJPY=X"},
-    "GBP/AUD OTC":                  {"source": "yahoo", "ticker": "GBPAUD=X"},
-    "EUR/HUF OTC":                  {"source": "yahoo", "ticker": "EURHUF=X"},
-    "EUR/TRY OTC":                  {"source": "yahoo", "ticker": "EURTRY=X"},
-    "USD/SGD OTC":                  {"source": "yahoo", "ticker": "USDSGD=X"},
-    "USD/THB OTC":                  {"source": "yahoo", "ticker": "USDTHB=X"},
-    "USD/MYR OTC":                  {"source": "yahoo", "ticker": "USDMYR=X"},
-    "Gold OTC":                     {"source": "yahoo", "ticker": "GC=F"},
-    "Silver OTC":                   {"source": "yahoo", "ticker": "SI=F"},
-    "Brent Oil OTC":                {"source": "yahoo", "ticker": "BZ=F"},
-    "WTI Crude Oil OTC":            {"source": "yahoo", "ticker": "CL=F"},
-    "Natural Gas OTC":              {"source": "yahoo", "ticker": "NG=F"},
-    "Platinum spot OTC":            {"source": "yahoo", "ticker": "PL=F"},
-    "Palladium spot OTC":           {"source": "yahoo", "ticker": "PA=F"},
-    "Tesla OTC":                    {"source": "yahoo", "ticker": "TSLA"},
-    "Apple OTC":                    {"source": "yahoo", "ticker": "AAPL"},
-    "Amazon OTC":                   {"source": "yahoo", "ticker": "AMZN"},
-    "Microsoft OTC":                {"source": "yahoo", "ticker": "MSFT"},
-    "Netflix OTC":                  {"source": "yahoo", "ticker": "NFLX"},
-    "FACEBOOK INC OTC":             {"source": "yahoo", "ticker": "META"},
-    "Coinbase Global OTC":          {"source": "yahoo", "ticker": "COIN"},
-    "Alibaba OTC":                  {"source": "yahoo", "ticker": "BABA"},
-    "Intel OTC":                    {"source": "yahoo", "ticker": "INTC"},
-    "Cisco OTC":                    {"source": "yahoo", "ticker": "CSCO"},
-    "ExxonMobil OTC":               {"source": "yahoo", "ticker": "XOM"},
-    "FedEx OTC":                    {"source": "yahoo", "ticker": "FDX"},
-    "GameStop Corp OTC":            {"source": "yahoo", "ticker": "GME"},
-    "Marathon Digital Holdings OTC":{"source": "yahoo", "ticker": "MARA"},
-    "VISA OTC":                     {"source": "yahoo", "ticker": "V"},
-    "VIX OTC":                      {"source": "yahoo", "ticker": "^VIX"},
-    "Johnson & Johnson OTC":        {"source": "yahoo", "ticker": "JNJ"},
-    "Palantir Technologies OTC":    {"source": "yahoo", "ticker": "PLTR"},
-    "Citigroup Inc OTC":            {"source": "yahoo", "ticker": "C"},
-    "American Express OTC":         {"source": "yahoo", "ticker": "AXP"},
-    "Advanced Micro Devices OTC":   {"source": "yahoo", "ticker": "AMD"},
-    "McDonald's OTC":               {"source": "yahoo", "ticker": "MCD"},
+    # Форекс
+    "EUR/USD":   {"source": "tv", "symbol": "EURUSD",     "exchange": "FX"},
+    "GBP/USD":   {"source": "tv", "symbol": "GBPUSD",     "exchange": "FX"},
+    "AUD/USD":   {"source": "tv", "symbol": "AUDUSD",     "exchange": "FX"},
+    "USD/JPY":   {"source": "tv", "symbol": "USDJPY",     "exchange": "FX"},
+    "USD/CAD":   {"source": "tv", "symbol": "USDCAD",     "exchange": "FX"},
+    "USD/CHF":   {"source": "tv", "symbol": "USDCHF",     "exchange": "FX"},
+    "EUR/GBP":   {"source": "tv", "symbol": "EURGBP",     "exchange": "FX"},
+    "EUR/JPY":   {"source": "tv", "symbol": "EURJPY",     "exchange": "FX"},
+    "EUR/CHF":   {"source": "tv", "symbol": "EURCHF",     "exchange": "FX"},
+    "EUR/AUD":   {"source": "tv", "symbol": "EURAUD",     "exchange": "FX"},
+    "EUR/CAD":   {"source": "tv", "symbol": "EURCAD",     "exchange": "FX"},
+    "GBP/JPY":   {"source": "tv", "symbol": "GBPJPY",     "exchange": "FX"},
+    "GBP/CHF":   {"source": "tv", "symbol": "GBPCHF",     "exchange": "FX"},
+    "GBP/AUD":   {"source": "tv", "symbol": "GBPAUD",     "exchange": "FX"},
+    "GBP/CAD":   {"source": "tv", "symbol": "GBPCAD",     "exchange": "FX"},
+    "AUD/JPY":   {"source": "tv", "symbol": "AUDJPY",     "exchange": "FX"},
+    "AUD/CAD":   {"source": "tv", "symbol": "AUDCAD",     "exchange": "FX"},
+    "AUD/CHF":   {"source": "tv", "symbol": "AUDCHF",     "exchange": "FX"},
+    "CAD/JPY":   {"source": "tv", "symbol": "CADJPY",     "exchange": "FX"},
+    "CAD/CHF":   {"source": "tv", "symbol": "CADCHF",     "exchange": "FX"},
+    "CHF/JPY":   {"source": "tv", "symbol": "CHFJPY",     "exchange": "FX"},
+    "NZD/USD":   {"source": "tv", "symbol": "NZDUSD",     "exchange": "FX"},
+    "NZD/JPY":   {"source": "tv", "symbol": "NZDJPY",     "exchange": "FX"},
+    "NZD/CAD":   {"source": "tv", "symbol": "NZDCAD",     "exchange": "FX"},
+    "NZD/CHF":   {"source": "tv", "symbol": "NZDCHF",     "exchange": "FX"},
+    "NZD/GBP":   {"source": "tv", "symbol": "NZDGBP",     "exchange": "FX"},
+    # Крипто
+    "Bitcoin":        {"source": "binance", "ticker": "BTC/USDT"},
+    "Ethereum":       {"source": "binance", "ticker": "ETH/USDT"},
+    "Dash":           {"source": "binance", "ticker": "DASH/USDT"},
+    "Chainlink":      {"source": "binance", "ticker": "LINK/USDT"},
+    "Bitcoin Cash":   {"source": "binance", "ticker": "BCH/USDT"},
+    # Акции
+    "Apple":          {"source": "tv", "symbol": "AAPL",  "exchange": "NASDAQ"},
+    "Microsoft":      {"source": "tv", "symbol": "MSFT",  "exchange": "NASDAQ"},
+    "Tesla":          {"source": "tv", "symbol": "TSLA",  "exchange": "NASDAQ"},
+    "Netflix":        {"source": "tv", "symbol": "NFLX",  "exchange": "NASDAQ"},
+    "Amazon":         {"source": "tv", "symbol": "AMZN",  "exchange": "NASDAQ"},
+    "Google":         {"source": "tv", "symbol": "GOOGL", "exchange": "NASDAQ"},
+    "Meta":           {"source": "tv", "symbol": "META",  "exchange": "NASDAQ"},
+    "Intel":          {"source": "tv", "symbol": "INTC",  "exchange": "NASDAQ"},
+    "Cisco":          {"source": "tv", "symbol": "CSCO",  "exchange": "NASDAQ"},
+    "ExxonMobil":     {"source": "tv", "symbol": "XOM",   "exchange": "NYSE"},
+    "Johnson & Johnson": {"source": "tv", "symbol": "JNJ", "exchange": "NYSE"},
+    "Pfizer":         {"source": "tv", "symbol": "PFE",   "exchange": "NYSE"},
+    "Boeing":         {"source": "tv", "symbol": "BA",    "exchange": "NYSE"},
+    "McDonald's":     {"source": "tv", "symbol": "MCD",   "exchange": "NYSE"},
+    "JPMorgan":       {"source": "tv", "symbol": "JPM",   "exchange": "NYSE"},
+    "American Express": {"source": "tv", "symbol": "AXP", "exchange": "NYSE"},
+    "Citigroup":      {"source": "tv", "symbol": "C",     "exchange": "NYSE"},
+    "Alibaba":        {"source": "tv", "symbol": "BABA",  "exchange": "NYSE"},
+    # Индексы
+    "US100":          {"source": "tv", "symbol": "NDX",   "exchange": "NASDAQ"},
+    "SP500":          {"source": "tv", "symbol": "SPX",   "exchange": "SP"},
+    "DJI30":          {"source": "tv", "symbol": "DJI",   "exchange": "DJ"},
+    "DAX":            {"source": "tv", "symbol": "DAX",   "exchange": "XETR"},
+    "FTSE 100":       {"source": "tv", "symbol": "UKX",   "exchange": "LSE"},
+    "CAC 40":         {"source": "tv", "symbol": "PX1",   "exchange": "EURONEXT"},
+    "Nikkei 225":     {"source": "tv", "symbol": "NI225", "exchange": "TVC"},
+    "AUS 200":        {"source": "tv", "symbol": "AS51",  "exchange": "TVC"},
+    "Euro Stoxx 50":  {"source": "tv", "symbol": "SX5E",  "exchange": "TVC"},
+    "Hang Seng":      {"source": "tv", "symbol": "HSI",   "exchange": "TVC"},
+    # Товары
+    "Gold":           {"source": "tv", "symbol": "GOLD",       "exchange": "TVC"},
+    "Silver":         {"source": "tv", "symbol": "SILVER",     "exchange": "TVC"},
+    "Oil Brent":      {"source": "tv", "symbol": "UKOIL",      "exchange": "TVC"},
+    "Oil WTI":        {"source": "tv", "symbol": "USOIL",      "exchange": "TVC"},
+    "Natural Gas":    {"source": "tv", "symbol": "NATURALGAS", "exchange": "TVC"},
+    "Platinum":       {"source": "tv", "symbol": "PLATINUM",   "exchange": "TVC"},
 }
 
-TIMEFRAME_MAP = {
-    "M1":  {"binance": "1m",  "yahoo": "1m",  "yahoo_period": "1d"},
-    "M3":  {"binance": "3m",  "yahoo": "5m",  "yahoo_period": "5d"},
-    "M5":  {"binance": "5m",  "yahoo": "5m",  "yahoo_period": "5d"},
-    "M10": {"binance": "15m", "yahoo": "15m", "yahoo_period": "5d"},
-    "M15": {"binance": "15m", "yahoo": "15m", "yahoo_period": "5d"},
+TV_INTERVAL_MAP = {
+    "M1":  {"tv": Interval.in_1_minute,  "binance": "1m"},
+    "M3":  {"tv": Interval.in_3_minute,  "binance": "3m"},
+    "M5":  {"tv": Interval.in_5_minute,  "binance": "5m"},
+    "M10": {"tv": Interval.in_10_minute, "binance": "15m"},
+    "M15": {"tv": Interval.in_15_minute, "binance": "15m"},
 }
 
-HIGHER_TIMEFRAME_MAP = {
-    "M1":  {"binance": "5m",  "yahoo": "5m",  "yahoo_period": "5d"},
-    "M3":  {"binance": "15m", "yahoo": "15m", "yahoo_period": "5d"},
-    "M5":  {"binance": "15m", "yahoo": "15m", "yahoo_period": "5d"},
-    "M10": {"binance": "1h",  "yahoo": "1h",  "yahoo_period": "1mo"},
-    "M15": {"binance": "1h",  "yahoo": "1h",  "yahoo_period": "1mo"},
+TV_HIGHER_MAP = {
+    "M1":  {"tv": Interval.in_5_minute,  "binance": "5m"},
+    "M3":  {"tv": Interval.in_15_minute, "binance": "15m"},
+    "M5":  {"tv": Interval.in_15_minute, "binance": "15m"},
+    "M10": {"tv": Interval.in_1_hour,    "binance": "1h"},
+    "M15": {"tv": Interval.in_1_hour,    "binance": "1h"},
 }
 
 HISTORY_FILE     = "signals_history.json"
-FOREX_OPEN_HOUR  = 8
-FOREX_CLOSE_HOUR = 17
 CACHE_TTL        = 30
 _cache: dict     = {}
 
@@ -145,14 +139,17 @@ def save_history(history: list):
         json.dump(history, f, ensure_ascii=False, indent=2)
 
 
-def is_forex_open(symbol: str) -> bool:
-    config = ASSET_CONFIG.get(symbol, {"source": "binance"})
-    if config["source"] == "binance":
-        return True
-    now_utc = datetime.now(timezone.utc)
-    if now_utc.weekday() >= 5:
-        return False
-    return FOREX_OPEN_HOUR <= now_utc.hour < FOREX_CLOSE_HOUR
+def get_candles_tv(symbol: str, exchange: str, interval: Interval, n_bars: int = 150) -> pd.DataFrame:
+    tv = TvDatafeed()
+    df = tv.get_hist(symbol=symbol, exchange=exchange, interval=interval, n_bars=n_bars)
+    if df is None or df.empty:
+        raise ValueError(f"TvDatafeed вернул пустые данные для {symbol}:{exchange}")
+    df = df.reset_index()
+    # Rename columns to standard format
+    df = df.rename(columns={"datetime": "timestamp"})
+    df = df[["timestamp", "open", "high", "low", "close", "volume"]].copy()
+    df.dropna(inplace=True)
+    return df
 
 
 def get_candles_binance(ticker: str, timeframe: str, limit: int = 150) -> pd.DataFrame:
@@ -160,22 +157,6 @@ def get_candles_binance(ticker: str, timeframe: str, limit: int = 150) -> pd.Dat
     raw = exchange.fetch_ohlcv(ticker, timeframe, limit=limit)
     df = pd.DataFrame(raw, columns=["timestamp", "open", "high", "low", "close", "volume"])
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-    return df
-
-
-def get_candles_yahoo(ticker: str, interval: str, period: str) -> pd.DataFrame:
-    data = yf.download(ticker, interval=interval, period=period, progress=False)
-    if data.empty:
-        raise ValueError(f"Yahoo Finance не вернул данные для {ticker}")
-    df = data.reset_index()
-    df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
-    df = df.rename(columns={
-        "Datetime": "timestamp", "Date": "timestamp",
-        "Open": "open", "High": "high",
-        "Low": "low", "Close": "close", "Volume": "volume"
-    })
-    df = df[["timestamp", "open", "high", "low", "close", "volume"]].copy()
-    df.dropna(inplace=True)
     return df
 
 
@@ -187,12 +168,12 @@ def get_candles(symbol: str, timeframe: str, higher: bool = False) -> pd.DataFra
         if now - cached_time < CACHE_TTL:
             return cached_df.copy()
     config    = ASSET_CONFIG.get(symbol, {"source": "binance", "ticker": "BTC/USDT"})
-    tf_map    = HIGHER_TIMEFRAME_MAP if higher else TIMEFRAME_MAP
+    tf_map    = TV_HIGHER_MAP if higher else TV_INTERVAL_MAP
     tf_config = tf_map.get(timeframe, tf_map.get("M1"))
     if config["source"] == "binance":
         df = get_candles_binance(config["ticker"], tf_config["binance"])
     else:
-        df = get_candles_yahoo(config["ticker"], tf_config["yahoo"], tf_config["yahoo_period"])
+        df = get_candles_tv(config["symbol"], config["exchange"], tf_config["tv"])
     _cache[cache_key] = (now, df.copy())
     return df
 
@@ -204,9 +185,9 @@ def get_current_price(symbol: str) -> float | None:
             exchange = ccxt.binance({"enableRateLimit": True})
             return exchange.fetch_ticker(config["ticker"])["last"]
         else:
-            data = yf.download(config["ticker"], period="1d", interval="1m", progress=False)
-            if not data.empty:
-                return float(data["Close"].iloc[-1])
+            df = get_candles_tv(config["symbol"], config["exchange"], Interval.in_1_minute, n_bars=1)
+            if not df.empty:
+                return float(df["close"].iloc[-1])
     except Exception:
         return None
 
@@ -441,31 +422,22 @@ def get_history():
 
 @app.post("/signal")
 def get_signal(payload: SignalRequest):
-    if not is_forex_open(payload.symbol):
+    try:
+        df = get_candles(payload.symbol, payload.timeframe, higher=False)
+        try:
+            df_higher    = get_candles(payload.symbol, payload.timeframe, higher=True)
+            higher_trend = get_higher_trend(df_higher)
+        except Exception:
+            higher_trend = "neutral"
+        result = analyze(df, higher_trend, payload.mode or "Уверенный")
+    except Exception as e:
         result = {
             "signal":      "NO SIGNAL",
             "confidence":  0,
-            "reasons":     ["Рынок закрыт — форекс работает пн-пт 08:00-17:00 UTC"],
+            "reasons":     [f"Ошибка: {str(e)}"],
             "state":       "neutral",
             "entry_price": None,
         }
-    else:
-        try:
-            df = get_candles(payload.symbol, payload.timeframe, higher=False)
-            try:
-                df_higher    = get_candles(payload.symbol, payload.timeframe, higher=True)
-                higher_trend = get_higher_trend(df_higher)
-            except Exception:
-                higher_trend = "neutral"
-            result = analyze(df, higher_trend, payload.mode or "Уверенный")
-        except Exception as e:
-            result = {
-                "signal":      "NO SIGNAL",
-                "confidence":  0,
-                "reasons":     [f"Ошибка: {str(e)}"],
-                "state":       "neutral",
-                "entry_price": None,
-            }
 
     history = load_history()
     history = update_win_rate(history, payload.symbol)
@@ -503,13 +475,6 @@ def get_signal(payload: SignalRequest):
 @app.post("/scan")
 def scan_all_timeframes(payload: SignalRequest):
     """AI Сканер — анализирует все таймфреймы сразу."""
-    if not is_forex_open(payload.symbol):
-        return {
-            "results": [],
-            "best":    None,
-            "reason":  "Рынок закрыт — форекс работает пн-пт 08:00-17:00 UTC"
-        }
-
     timeframes_to_scan = ["M1", "M3", "M5", "M10", "M15"]
     results = []
 

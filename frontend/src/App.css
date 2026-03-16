@@ -49,7 +49,7 @@ button, input, select {
 
 .phone-shell {
   width: 100%;
-  max-width: 420px;
+  max-width: 480px;
   display: flex;
   flex-direction: column;
   gap: 12px;

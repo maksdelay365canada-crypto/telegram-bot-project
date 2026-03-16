@@ -3,9 +3,10 @@ uvicorn==0.41.0
 python-telegram-bot==22.6
 httpx==0.28.1
 ccxt==4.5.43
-yfinance==1.2.0
+tvdatafeed
 pandas==3.0.1
 pandas-ta==0.4.71b0
 numpy==2.2.6
 requests==2.32.5
 python-dotenv==1.2.2
+websocket-client
