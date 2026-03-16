@@ -1141,10 +1141,105 @@
     ],
     "state": "bullish",
     "entry_price": 9.19,
-    "exit_price": null,
-    "result": null,
+    "exit_price": 72420.12,
+    "result": "WIN",
     "symbol": "Chainlink OTC",
     "timeframe": "M3",
     "timestamp": "2026-03-15T20:30:00.970850"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 67,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 72402.01,
+    "exit_price": 72431.29,
+    "result": "LOSS",
+    "symbol": "Bitcoin ETF OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-16T01:05:46.063753"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 71,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "RSI в медвежьей зоне (41)",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 72433.24,
+    "exit_price": null,
+    "result": null,
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-16T01:10:12.733377"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 71,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "RSI в медвежьей зоне (41)",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 72433.24,
+    "exit_price": null,
+    "result": null,
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-16T01:10:26.774097"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 71,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "RSI в медвежьей зоне (41)",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 72433.24,
+    "exit_price": null,
+    "result": null,
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-16T01:10:33.053243"
+  },
+  {
+    "signal": "DOWN",
+    "confidence": 85,
+    "reasons": [
+      "Быстрая EMA ниже медленной",
+      "RSI в медвежьей зоне (42)",
+      "Импульс отрицательный",
+      "MACD подтверждает падение",
+      "Свеча медвежья",
+      "Bollinger: зона падения",
+      "Тренд старшего ТФ подтверждает падение"
+    ],
+    "state": "bearish",
+    "entry_price": 72431.28,
+    "exit_price": null,
+    "result": null,
+    "symbol": "Bitcoin OTC",
+    "timeframe": "M1",
+    "timestamp": "2026-03-16T01:12:01.826555"
   }
 ]
