@@ -475,7 +475,7 @@ def get_signal(payload: SignalRequest):
 @app.post("/scan")
 def scan_all_timeframes(payload: SignalRequest):
     """AI Сканер — анализирует все таймфреймы сразу."""
-    timeframes_to_scan = ["M1", "M3", "M5", "M10", "M15"]
+    timeframes_to_scan = ["M1", "M3", "M5", "M15"]
     results = []
 
     for tf in timeframes_to_scan:
