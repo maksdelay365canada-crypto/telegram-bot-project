@@ -273,7 +273,7 @@ def analyze(df: pd.DataFrame, higher_trend: str = "neutral", mode: str = "Уве
 
     last = df.iloc[-1]
 
-    if (float(last["atr"]) / float(last["close"])) < 0.0003:
+    if (float(last["atr"]) / float(last["close"])) < 0.00005:
         return {"signal": "NO SIGNAL", "confidence": 0,
                 "reasons": ["Рынок в боковике"], "state": "neutral",
                 "entry_price": float(last["close"])}

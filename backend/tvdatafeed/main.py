@@ -7,6 +7,7 @@ import logging
 import random
 import re
 import string
+import threading
 from datetime import datetime
 from enum import Enum
 
@@ -15,8 +16,8 @@ import websocket
 
 logger = logging.getLogger(__name__)
 
-# TradingView WebSocket URL
 _WS_URL = "wss://data.tradingview.com/socket.io/websocket?from=chart%2F"
+_TIMEOUT = 20  # max seconds to wait for data
 
 
 class Interval(Enum):
@@ -51,7 +52,6 @@ def _msg(func: str, params: list) -> str:
 class TvDatafeed:
     def __init__(self, username: str = None, password: str = None):
         self._token = "unauthorized_user_token"
-        # Auth is optional — anonymous access works for most public symbols
         if username and password:
             try:
                 self._token = self._get_token(username, password)
@@ -67,8 +67,7 @@ class TvDatafeed:
             headers={"Referer": "https://www.tradingview.com"},
             timeout=10,
         )
-        data = r.json()
-        return data["user"]["auth_token"]
+        return r.json()["user"]["auth_token"]
 
     def get_hist(
         self,
@@ -77,22 +76,19 @@ class TvDatafeed:
         interval: Interval,
         n_bars: int = 300,
     ) -> pd.DataFrame:
-        """
-        Fetch OHLCV history from TradingView.
-        Returns DataFrame with index=datetime, columns=[open,high,low,close,volume].
-        Returns empty DataFrame on failure.
-        """
         full_symbol = f"{exchange}:{symbol}"
         iv = interval.value if isinstance(interval, Interval) else str(interval)
 
         chart_sess = f"cs_{_rand_str(12)}"
         quote_sess = f"qs_{_rand_str(12)}"
 
-        collected: list[dict] = []
-        done = False
+        collected: list = []
+        done_event = threading.Event()
+        ws_ref: list = [None]
 
         def on_open(ws):
-            ws.send(_msg("set_auth_token",   [self._token]))
+            ws_ref[0] = ws
+            ws.send(_msg("set_auth_token",       [self._token]))
             ws.send(_msg("chart_create_session", [chart_sess, ""]))
             ws.send(_msg("quote_create_session", [quote_sess]))
             ws.send(_msg("quote_add_symbols",
@@ -105,16 +101,17 @@ class TvDatafeed:
                          [chart_sess, "s1", "s1", "sym_1", iv, n_bars]))
 
         def on_message(ws, raw):
-            nonlocal done
             # Heartbeat
-            if "~h~" in raw:
-                for part in raw.split("~m~"):
-                    if part.startswith("~h~"):
+            for part in re.split(r"~m~\d+~m~", raw):
+                if part.startswith("~h~"):
+                    try:
                         ws.send(_frame(part))
-                return
+                    except Exception:
+                        pass
 
+            # Parse JSON chunks
             for chunk in re.split(r"~m~\d+~m~", raw):
-                if not chunk:
+                if not chunk or not chunk.startswith("{"):
                     continue
                 try:
                     obj = json.loads(chunk)
@@ -125,32 +122,39 @@ class TvDatafeed:
                 if m_type not in ("timescale_update", "du"):
                     continue
 
-                payload = obj.get("p", [None, {}])
-                series_data = payload[1] if len(payload) > 1 else {}
-                s1 = series_data.get("s1")
+                payload = obj.get("p", [])
+                series_map = payload[1] if len(payload) > 1 else {}
+                s1 = series_map.get("s1") if isinstance(series_map, dict) else None
                 if not s1:
                     continue
 
-                for bar in s1.get("s", []):
+                bars = s1.get("s", [])
+                for bar in bars:
                     v = bar.get("v", [])
                     if len(v) < 5:
                         continue
                     collected.append({
                         "datetime": datetime.utcfromtimestamp(v[0]),
-                        "open":     v[1],
-                        "high":     v[2],
-                        "low":      v[3],
-                        "close":    v[4],
-                        "volume":   v[5] if len(v) > 5 else 0.0,
+                        "open":     float(v[1]),
+                        "high":     float(v[2]),
+                        "low":      float(v[3]),
+                        "close":    float(v[4]),
+                        "volume":   float(v[5]) if len(v) > 5 else 0.0,
                     })
 
                 if collected:
-                    done = True
-                    ws.close()
+                    done_event.set()
+                    try:
+                        ws.close()
+                    except Exception:
+                        pass
 
         def on_error(ws, error):
-            logger.error(f"TvDatafeed WS error for {full_symbol}: {error}")
-            ws.close()
+            logger.debug(f"TvDatafeed WS error [{full_symbol}]: {error}")
+            done_event.set()
+
+        def on_close(ws, *args):
+            done_event.set()
 
         ws = websocket.WebSocketApp(
             _WS_URL,
@@ -158,15 +162,30 @@ class TvDatafeed:
             on_open=on_open,
             on_message=on_message,
             on_error=on_error,
+            on_close=on_close,
         )
-        ws.run_forever(ping_interval=20, ping_timeout=10)
+
+        thread = threading.Thread(
+            target=ws.run_forever,
+            kwargs={"ping_interval": 10, "ping_timeout": 5},
+            daemon=True,
+        )
+        thread.start()
+
+        # Wait at most _TIMEOUT seconds
+        done_event.wait(timeout=_TIMEOUT)
+        try:
+            ws.close()
+        except Exception:
+            pass
 
         if not collected:
-            logger.warning(f"TvDatafeed: no data for {full_symbol} {iv}")
+            logger.warning(f"TvDatafeed: no data received for {full_symbol} interval={iv}")
             return pd.DataFrame()
 
         df = pd.DataFrame(collected)
         df.set_index("datetime", inplace=True)
         df.index = pd.to_datetime(df.index)
+        df = df[~df.index.duplicated(keep="last")]
         df.sort_index(inplace=True)
         return df
