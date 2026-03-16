@@ -1,1 +1,1 @@
-worker: python backend/telegram_bot.py
+web: pip install -r backend/requirements.txt && bash start.sh

@@ -1,14 +1,16 @@
 import asyncio
 import logging
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import httpx
 
 # ── Настройки ──
-BOT_TOKEN = "7796005388:AAGu2HYvBRujBIfu4K2DzTxgr3ZFlHW3D80"
-CHAT_ID   = 884778391
-BACKEND   = "http://127.0.0.1:8000"
-MINI_APP_URL = "https://sunny-piroshki-176919.netlify.app"
+BOT_TOKEN    = os.getenv("BOT_TOKEN", "7796005388:AAGu2HYvBRujBIfu4K2DzTxgr3ZFlHW3D80")
+CHAT_ID      = 884778391
+PORT         = os.getenv("PORT", "8000")
+BACKEND      = os.getenv("BACKEND_URL", f"http://127.0.0.1:{PORT}")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://leafy-crostata-88c707.netlify.app")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
