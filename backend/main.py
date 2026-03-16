@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 import os
 import time
@@ -119,6 +119,8 @@ FOREX_OPEN_HOUR  = 8
 FOREX_CLOSE_HOUR = 17
 CACHE_TTL        = 30
 _cache: dict     = {}
+
+TIMEFRAME_MINUTES = {"M1": 1, "M3": 3, "M5": 5, "M10": 10, "M15": 15}
 
 
 class SignalRequest(BaseModel):
@@ -493,6 +495,7 @@ def get_signal(payload: SignalRequest):
         "balance":     payload.balance,
         "mode":        payload.mode,
         "timestamp":   datetime.utcnow().isoformat(),
+        "expiry_time": (datetime.now(timezone.utc) + timedelta(minutes=TIMEFRAME_MINUTES.get(payload.timeframe, 1))).isoformat(),
         "win_rate":    calc_win_rate(history),
     }
 
@@ -557,3 +560,8 @@ def scan_all_timeframes(payload: SignalRequest):
         "best":    best,
         "reason":  best_reason,
     }
+
+
+@app.get("/price")
+def get_price(symbol: str):
+    return {"symbol": symbol, "price": get_current_price(symbol)}
