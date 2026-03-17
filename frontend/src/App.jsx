@@ -56,8 +56,6 @@ const CATEGORIES = {
   "Акции":      ["Apple","Microsoft","Tesla","Netflix","Amazon","Google","Meta","Intel","Cisco","ExxonMobil","Johnson & Johnson","Pfizer","Boeing","McDonald's","JPMorgan","American Express","Citigroup","Alibaba"],
   "Индексы":    ["US100","SP500","DJI30","DAX","FTSE 100","CAC 40","Nikkei 225","AUS 200","Euro Stoxx 50","Hang Seng"],
   "Товары":     ["Gold","Silver","Oil Brent","Oil WTI","Natural Gas","Platinum"],
-  "OTC Форекс": ["EUR/USD OTC","GBP/USD OTC","AUD/USD OTC","USD/JPY OTC","USD/CAD OTC","USD/CHF OTC","EUR/GBP OTC","EUR/JPY OTC","GBP/JPY OTC"],
-  "Синтетика":  ["Volatility 10","Volatility 25","Volatility 50","Volatility 75","Volatility 100","Boom 500","Boom 1000","Crash 500","Crash 1000"],
 };
 
 const TIMEFRAMES = [
