@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const ASSET_TV = {
+  // Regular markets
   "EUR/USD": "FX:EURUSD", "GBP/USD": "FX:GBPUSD", "AUD/USD": "FX:AUDUSD",
   "USD/JPY": "FX:USDJPY", "USD/CAD": "FX:USDCAD", "USD/CHF": "FX:USDCHF",
   "EUR/GBP": "FX:EURGBP", "EUR/JPY": "FX:EURJPY", "EUR/CHF": "FX:EURCHF",
@@ -28,14 +29,35 @@ const ASSET_TV = {
   "Euro Stoxx 50": "TVC:SX5E", "Hang Seng": "TVC:HSI",
   "Gold": "TVC:GOLD", "Silver": "TVC:SILVER", "Oil Brent": "TVC:UKOIL",
   "Oil WTI": "TVC:USOIL", "Natural Gas": "TVC:NATURALGAS", "Platinum": "TVC:PLATINUM",
+  // OTC Forex — TradingView proxy charts
+  "EUR/USD OTC": "FX:EURUSD", "GBP/USD OTC": "FX:GBPUSD",
+  "AUD/USD OTC": "FX:AUDUSD", "USD/JPY OTC": "FX:USDJPY",
+  "USD/CAD OTC": "FX:USDCAD", "USD/CHF OTC": "FX:USDCHF",
+  "EUR/GBP OTC": "FX:EURGBP", "EUR/JPY OTC": "FX:EURJPY",
+  "GBP/JPY OTC": "FX:GBPJPY",
+  // Deriv synthetics — no TradingView chart (null = show placeholder)
+  "Volatility 10": null, "Volatility 25": null, "Volatility 50": null,
+  "Volatility 75": null, "Volatility 100": null,
+  "Boom 500": null, "Boom 1000": null,
+  "Crash 500": null, "Crash 1000": null,
 };
 
+// Assets that are OTC (no real market, broker/synthetic pricing)
+const OTC_ASSETS = new Set([
+  "EUR/USD OTC","GBP/USD OTC","AUD/USD OTC","USD/JPY OTC","USD/CAD OTC",
+  "USD/CHF OTC","EUR/GBP OTC","EUR/JPY OTC","GBP/JPY OTC",
+  "Volatility 10","Volatility 25","Volatility 50","Volatility 75","Volatility 100",
+  "Boom 500","Boom 1000","Crash 500","Crash 1000",
+]);
+
 const CATEGORIES = {
-  "Форекс": ["EUR/USD","GBP/USD","AUD/USD","USD/JPY","USD/CAD","USD/CHF","EUR/GBP","EUR/JPY","EUR/CHF","EUR/AUD","EUR/CAD","GBP/JPY","GBP/CHF","GBP/AUD","GBP/CAD","AUD/JPY","AUD/CAD","AUD/CHF","CAD/JPY","CAD/CHF","CHF/JPY","NZD/USD","NZD/JPY","NZD/CAD","NZD/CHF","NZD/GBP"],
-  "Крипто": ["Bitcoin","Ethereum","Dash","Chainlink","Bitcoin Cash"],
-  "Акции": ["Apple","Microsoft","Tesla","Netflix","Amazon","Google","Meta","Intel","Cisco","ExxonMobil","Johnson & Johnson","Pfizer","Boeing","McDonald's","JPMorgan","American Express","Citigroup","Alibaba"],
-  "Индексы": ["US100","SP500","DJI30","DAX","FTSE 100","CAC 40","Nikkei 225","AUS 200","Euro Stoxx 50","Hang Seng"],
-  "Товары": ["Gold","Silver","Oil Brent","Oil WTI","Natural Gas","Platinum"],
+  "Форекс":     ["EUR/USD","GBP/USD","AUD/USD","USD/JPY","USD/CAD","USD/CHF","EUR/GBP","EUR/JPY","EUR/CHF","EUR/AUD","EUR/CAD","GBP/JPY","GBP/CHF","GBP/AUD","GBP/CAD","AUD/JPY","AUD/CAD","AUD/CHF","CAD/JPY","CAD/CHF","CHF/JPY","NZD/USD","NZD/JPY","NZD/CAD","NZD/CHF","NZD/GBP"],
+  "Крипто":     ["Bitcoin","Ethereum","Dash","Chainlink","Bitcoin Cash"],
+  "Акции":      ["Apple","Microsoft","Tesla","Netflix","Amazon","Google","Meta","Intel","Cisco","ExxonMobil","Johnson & Johnson","Pfizer","Boeing","McDonald's","JPMorgan","American Express","Citigroup","Alibaba"],
+  "Индексы":    ["US100","SP500","DJI30","DAX","FTSE 100","CAC 40","Nikkei 225","AUS 200","Euro Stoxx 50","Hang Seng"],
+  "Товары":     ["Gold","Silver","Oil Brent","Oil WTI","Natural Gas","Platinum"],
+  "OTC Форекс": ["EUR/USD OTC","GBP/USD OTC","AUD/USD OTC","USD/JPY OTC","USD/CAD OTC","USD/CHF OTC","EUR/GBP OTC","EUR/JPY OTC","GBP/JPY OTC"],
+  "Синтетика":  ["Volatility 10","Volatility 25","Volatility 50","Volatility 75","Volatility 100","Boom 500","Boom 1000","Crash 500","Crash 1000"],
 };
 
 const TIMEFRAMES = [
@@ -163,6 +185,11 @@ function TradeCard({ trade }) {
           <span style={{ background: modeColor + "20", color: modeColor, padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}>
             {modeLabel}
           </span>
+          {trade.is_otc && (
+            <span style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b", padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}>
+              OTC
+            </span>
+          )}
           {trade.is_martingale && (
             <span style={{ background: "rgba(249,115,22,0.15)", color: C.orange, padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}>
               ДОГОН {trade.martingale_step}/3
@@ -280,22 +307,26 @@ export default function App() {
   }
 
   async function postHistoryAdd(id, sig, expiry, scannerMode, step) {
+    const sym = sig.symbol || symbol;
+    const otc = OTC_ASSETS.has(sym);
     try {
       await fetch(`${API}/history/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          trade_id:      id,
-          signal:        sig.signal,
-          confidence:    sig.confidence,
-          symbol:        sig.symbol || symbol,
-          timeframe:     sig.timeframe || timeframe,
-          mode_label:    scannerMode ? "ai_scanner" : "manual",
-          is_martingale: step > 0,
+          trade_id:        id,
+          signal:          sig.signal,
+          confidence:      sig.confidence,
+          symbol:          sym,
+          timeframe:       sig.timeframe || timeframe,
+          mode_label:      scannerMode ? "ai_scanner" : "manual",
+          is_martingale:   step > 0,
           martingale_step: step,
-          entry_price:   sig.entry_price,
-          expiry_time:   expiry,
-          reasons:       sig.reasons || [],
+          entry_price:     sig.entry_price,
+          expiry_time:     expiry,
+          reasons:         sig.reasons || [],
+          is_otc:          otc,
+          market_type:     otc ? "otc" : "forex",
         }),
       });
     } catch (_) {}
@@ -433,7 +464,8 @@ export default function App() {
 
   // ── derived values ────────────────────────────────────────────────────────
   const sigColor     = (s) => s === "UP" ? C.green : s === "DOWN" ? C.red : C.muted;
-  const tvSymbol     = ASSET_TV[symbol] || "FX:EURUSD";
+  const isOtc        = OTC_ASSETS.has(symbol);
+  const tvSymbol     = ASSET_TV[symbol] ?? null;   // null for Deriv synthetics
   const categoryList = CATEGORIES[category] || [];
   const inFlow       = flowStep !== "idle";
   const activeIsReal = signalData?.signal === "UP" || signalData?.signal === "DOWN";
@@ -454,6 +486,14 @@ export default function App() {
     return (
       <div style={{ background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: "8px", padding: "5px 12px", marginBottom: "12px", color: C.purple, fontWeight: 700, fontSize: "12px", textAlign: "center" }}>
         AI СКАНЕР · {tf}
+      </div>
+    );
+  }
+
+  function OtcBadge() {
+    return (
+      <div style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "8px", padding: "5px 12px", marginBottom: "12px", color: "#f59e0b", fontWeight: 700, fontSize: "12px", textAlign: "center" }}>
+        OTC · Синтетические / прокси котировки
       </div>
     );
   }
@@ -539,8 +579,16 @@ export default function App() {
           </select>
         </div>
 
-        {/* ── TradingView chart ── */}
-        <TradingViewWidget symbol={tvSymbol} interval={timeframe} />
+        {/* ── Chart ── */}
+        {tvSymbol ? (
+          <TradingViewWidget symbol={tvSymbol} interval={timeframe} />
+        ) : (
+          <div style={{ height: "160px", borderRadius: "16px", background: C.card, border: `1px solid ${C.border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            <div style={{ fontSize: "32px" }}>📊</div>
+            <div style={{ color: C.muted, fontSize: "13px", fontWeight: 600 }}>График недоступен для синтетических индексов</div>
+            <div style={{ color: C.muted, fontSize: "11px" }}>Данные поступают напрямую с Deriv API</div>
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════════════
             SIGNAL TAB
@@ -625,6 +673,7 @@ export default function App() {
                 }}>
                   {dogonStep > 0 && <DogonBadge step={dogonStep} />}
                   {isScanner && activeIsReal && <ScannerBadge tf={signalData.timeframe || timeframe} />}
+                  {isOtc && activeIsReal && <OtcBadge />}
 
                   {activeIsReal ? (
                     <>
@@ -689,6 +738,7 @@ export default function App() {
               }}>
                 {dogonStep > 0 && <DogonBadge step={dogonStep} />}
                 {isScanner && <ScannerBadge tf={signalData.timeframe || timeframe} />}
+                {isOtc && <OtcBadge />}
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                   <div>

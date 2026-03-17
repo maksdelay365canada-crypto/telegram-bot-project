@@ -1,8 +1,12 @@
 from datetime import datetime, timezone, timedelta
 import json
 import os
+import threading
 import time
+import logging
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 import pandas_ta as ta
 import ccxt
 from tvdatafeed import TvDatafeed, Interval
@@ -110,6 +114,35 @@ TV_HIGHER_MAP = {
     "M15": {"tv": Interval.in_1_hour,    "binance": "1h"},
 }
 
+# Deriv WebSocket granularity (seconds)
+DERIV_GRANULARITY = {"M1": 60, "M3": 180, "M5": 300, "M15": 900}
+DERIV_HIGHER_GRAN = {"M1": 300, "M3": 900, "M5": 900, "M15": 3600}
+
+OTC_ASSET_CONFIG = {
+    # ── Forex OTC (TradingView real data as proxy) ──────────────────────────
+    "EUR/USD OTC": {"source": "tv", "symbol": "EURUSD",  "exchange": "FX", "is_otc": True},
+    "GBP/USD OTC": {"source": "tv", "symbol": "GBPUSD",  "exchange": "FX", "is_otc": True},
+    "AUD/USD OTC": {"source": "tv", "symbol": "AUDUSD",  "exchange": "FX", "is_otc": True},
+    "USD/JPY OTC": {"source": "tv", "symbol": "USDJPY",  "exchange": "FX", "is_otc": True},
+    "USD/CAD OTC": {"source": "tv", "symbol": "USDCAD",  "exchange": "FX", "is_otc": True},
+    "USD/CHF OTC": {"source": "tv", "symbol": "USDCHF",  "exchange": "FX", "is_otc": True},
+    "EUR/GBP OTC": {"source": "tv", "symbol": "EURGBP",  "exchange": "FX", "is_otc": True},
+    "EUR/JPY OTC": {"source": "tv", "symbol": "EURJPY",  "exchange": "FX", "is_otc": True},
+    "GBP/JPY OTC": {"source": "tv", "symbol": "GBPJPY",  "exchange": "FX", "is_otc": True},
+    # ── Deriv Synthetic Indices (24/7, real Deriv data) ─────────────────────
+    "Volatility 10":  {"source": "deriv", "symbol": "R_10",      "is_otc": True},
+    "Volatility 25":  {"source": "deriv", "symbol": "R_25",      "is_otc": True},
+    "Volatility 50":  {"source": "deriv", "symbol": "R_50",      "is_otc": True},
+    "Volatility 75":  {"source": "deriv", "symbol": "R_75",      "is_otc": True},
+    "Volatility 100": {"source": "deriv", "symbol": "R_100",     "is_otc": True},
+    "Boom 500":       {"source": "deriv", "symbol": "BOOM500",   "is_otc": True},
+    "Boom 1000":      {"source": "deriv", "symbol": "BOOM1000",  "is_otc": True},
+    "Crash 500":      {"source": "deriv", "symbol": "CRASH500",  "is_otc": True},
+    "Crash 1000":     {"source": "deriv", "symbol": "CRASH1000", "is_otc": True},
+}
+
+ALL_ASSETS = {**ASSET_CONFIG, **OTC_ASSET_CONFIG}
+
 HISTORY_FILE     = "signals_history.json"
 CACHE_TTL        = 30
 _cache: dict     = {}
@@ -136,6 +169,8 @@ class HistoryAddRequest(BaseModel):
     entry_price: float | None = None
     expiry_time: str | None = None
     reasons: list[str] = []
+    is_otc: bool = False
+    market_type: str = "forex"  # "forex" or "otc"
 
 
 class HistoryUpdateRequest(BaseModel):
@@ -179,6 +214,71 @@ def get_candles_binance(ticker: str, timeframe: str, limit: int = 150) -> pd.Dat
     return df
 
 
+def get_candles_deriv(symbol: str, granularity: int, count: int = 150) -> pd.DataFrame:
+    """Fetch OHLCV candles from Deriv WebSocket API (synthetic indices, 24/7)."""
+    import websocket as _ws  # websocket-client, installed via requirements.txt  # noqa: F401
+    _WS_URL = "wss://ws.binaryws.com/websockets/v3?app_id=1089"
+    collected: list = []
+    done_event = threading.Event()
+
+    def on_open(ws):
+        ws.send(json.dumps({
+            "ticks_history": symbol,
+            "end":           "latest",
+            "count":         count,
+            "granularity":   granularity,
+            "style":         "candles",
+            "subscribe":     0,
+        }))
+
+    def on_message(ws, raw):
+        try:
+            data = json.loads(raw)
+            if data.get("msg_type") == "candles":
+                for c in data.get("candles", []):
+                    collected.append({
+                        "timestamp": datetime.fromtimestamp(c["epoch"], tz=timezone.utc),
+                        "open":      float(c["open"]),
+                        "high":      float(c["high"]),
+                        "low":       float(c["low"]),
+                        "close":     float(c["close"]),
+                        "volume":    1.0,   # Deriv doesn't provide volume
+                    })
+                done_event.set()
+                try: ws.close()
+                except Exception: pass
+        except Exception:
+            pass
+
+    def on_error(ws, error):
+        logger.debug(f"Deriv WS error [{symbol}]: {error}")
+        done_event.set()
+
+    def on_close(ws, *args):
+        done_event.set()
+
+    ws_app = _ws.WebSocketApp(
+        _WS_URL,
+        on_open=on_open, on_message=on_message,
+        on_error=on_error, on_close=on_close,
+    )
+    thread = threading.Thread(target=ws_app.run_forever, daemon=True)
+    thread.start()
+    done_event.wait(timeout=20)
+    try: ws_app.close()
+    except Exception: pass
+
+    if not collected:
+        raise ValueError(f"Deriv: no data received for {symbol}")
+
+    df = pd.DataFrame(collected)
+    df.set_index("timestamp", inplace=True)
+    df.index = pd.to_datetime(df.index)
+    df = df[~df.index.duplicated(keep="last")]
+    df.sort_index(inplace=True)
+    return df.reset_index()
+
+
 def get_candles(symbol: str, timeframe: str, higher: bool = False) -> pd.DataFrame:
     cache_key = f"{symbol}_{timeframe}_{'h' if higher else 'l'}"
     now = time.time()
@@ -186,23 +286,33 @@ def get_candles(symbol: str, timeframe: str, higher: bool = False) -> pd.DataFra
         cached_time, cached_df = _cache[cache_key]
         if now - cached_time < CACHE_TTL:
             return cached_df.copy()
-    config    = ASSET_CONFIG.get(symbol, {"source": "binance", "ticker": "BTC/USDT"})
+
+    config    = ALL_ASSETS.get(symbol, {"source": "binance", "ticker": "BTC/USDT"})
     tf_map    = TV_HIGHER_MAP if higher else TV_INTERVAL_MAP
     tf_config = tf_map.get(timeframe, tf_map.get("M1"))
-    if config["source"] == "binance":
+
+    if config["source"] == "deriv":
+        gran_map = DERIV_HIGHER_GRAN if higher else DERIV_GRANULARITY
+        df = get_candles_deriv(config["symbol"], gran_map.get(timeframe, 60))
+    elif config["source"] == "binance":
         df = get_candles_binance(config["ticker"], tf_config["binance"])
     else:
         df = get_candles_tv(config["symbol"], config["exchange"], tf_config["tv"])
+
     _cache[cache_key] = (now, df.copy())
     return df
 
 
 def get_current_price(symbol: str) -> float | None:
     try:
-        config = ASSET_CONFIG.get(symbol, {"source": "binance", "ticker": "BTC/USDT"})
+        config = ALL_ASSETS.get(symbol, {"source": "binance", "ticker": "BTC/USDT"})
         if config["source"] == "binance":
             exchange = ccxt.binance({"enableRateLimit": True})
             return exchange.fetch_ticker(config["ticker"])["last"]
+        elif config["source"] == "deriv":
+            df = get_candles_deriv(config["symbol"], granularity=60, count=2)
+            if not df.empty:
+                return float(df["close"].iloc[-1])
         else:
             df = get_candles_tv(config["symbol"], config["exchange"], Interval.in_1_minute, n_bars=1)
             if not df.empty:
@@ -491,6 +601,8 @@ def add_history_entry(payload: HistoryAddRequest):
         "result_confirmed": False,
         "expiry_time":     payload.expiry_time,
         "reasons":         payload.reasons,
+        "is_otc":          payload.is_otc,
+        "market_type":     payload.market_type,
         "timestamp":       datetime.now(timezone.utc).isoformat(),
     })
     history = history[-100:]
@@ -532,6 +644,7 @@ def get_signal(payload: SignalRequest):
     now = datetime.now(timezone.utc)
     history = load_history()
 
+    asset_cfg = ALL_ASSETS.get(payload.symbol, {})
     return {
         "signal":      result["signal"],
         "confidence":  result["confidence"],
@@ -545,6 +658,8 @@ def get_signal(payload: SignalRequest):
         "timestamp":   now.isoformat(),
         "expiry_time": (now + timedelta(minutes=TIMEFRAME_MINUTES.get(payload.timeframe, 1))).isoformat(),
         "win_rate":    calc_win_rate(history),
+        "is_otc":      asset_cfg.get("is_otc", False),
+        "market_type": "otc" if asset_cfg.get("is_otc") else "forex",
     }
 
 
