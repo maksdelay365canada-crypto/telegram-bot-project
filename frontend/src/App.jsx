@@ -277,6 +277,73 @@ function NewsEventCard({ event }) {
   );
 }
 
+// ─── Details panel ────────────────────────────────────────────────────────────
+function DetailsPanel({ data, signalData }) {
+  const sr    = data.support_resistance || {};
+  const fib   = data.fibonacci || {};
+  const trend = data.trend || {};
+  const cp    = data.chart_pattern || {};
+  const er    = data.entry_recommendation || {};
+  const currentPrice = signalData?.entry_price;
+
+  const trendIcon = trend.direction === "up" ? "↗️" : trend.direction === "down" ? "↘️" : "↔️";
+  const trendLabel = trend.direction === "up" ? "Восходящий" : trend.direction === "down" ? "Нисходящий" : "Боковик";
+  const strengthLabel = trend.strength === "strong" ? "сильный" : trend.strength === "moderate" ? "умеренный" : "слабый";
+  const cpIcon = cp.pattern_type === "bullish" ? "🔵" : cp.pattern_type === "bearish" ? "🔴" : "⚪";
+  const riskColor = er.risk_level === "низкий" ? C.green : er.risk_level === "высокий" ? C.red : "#f59e0b";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {/* Trend + Pattern */}
+      <div style={{ background: C.input, borderRadius: "10px", padding: "10px 12px", border: `1px solid ${C.border}` }}>
+        <div style={{ color: C.muted, fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>📊 Технический анализ</div>
+        <div style={{ fontSize: "12px", color: "#c8d0e0", lineHeight: "1.8" }}>
+          <div>Тренд: {trendIcon} {trendLabel} ({strengthLabel}, ADX: {trend.adx_value})</div>
+          {cp.pattern_name && <div>{cpIcon} Фигура: {cp.pattern_name} ({cp.confidence}%)</div>}
+        </div>
+      </div>
+
+      {/* Levels */}
+      {(sr.resistance_levels?.length > 0 || sr.support_levels?.length > 0) && (
+        <div style={{ background: C.input, borderRadius: "10px", padding: "10px 12px", border: `1px solid ${C.border}` }}>
+          <div style={{ color: C.muted, fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>📍 Ключевые уровни</div>
+          <div style={{ fontSize: "12px", lineHeight: "1.9" }}>
+            {sr.resistance_levels?.slice(0,3).map((r,i) => (
+              <div key={i} style={{ color: C.red }}>🔴 Сопр: {r.toLocaleString("ru-RU",{maximumFractionDigits:5})}</div>
+            ))}
+            {currentPrice && <div style={{ color: C.primary }}>▶ Текущая: {Number(currentPrice).toLocaleString("ru-RU",{maximumFractionDigits:5})}</div>}
+            {sr.support_levels?.slice(0,3).map((s,i) => (
+              <div key={i} style={{ color: C.green }}>🟢 Подд: {s.toLocaleString("ru-RU",{maximumFractionDigits:5})}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fibonacci */}
+      {fib.nearest_level_name && (
+        <div style={{ background: C.input, borderRadius: "10px", padding: "10px 12px", border: `1px solid ${C.border}` }}>
+          <div style={{ color: C.muted, fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "4px" }}>📐 Фибоначчи</div>
+          <div style={{ fontSize: "12px", color: "#c8d0e0" }}>
+            Ближайший уровень: <strong style={{ color: C.purple }}>{fib.nearest_level_name}</strong> = {fib.nearest_level_price?.toLocaleString("ru-RU",{maximumFractionDigits:5})}
+          </div>
+        </div>
+      )}
+
+      {/* Entry recommendation */}
+      {er.entry_zone && (
+        <div style={{ background: C.input, borderRadius: "10px", padding: "10px 12px", border: `1px solid ${C.border}` }}>
+          <div style={{ color: C.muted, fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>⚡ Точка входа</div>
+          <div style={{ fontSize: "12px", color: "#c8d0e0", lineHeight: "1.8" }}>
+            <div>Зона: <strong style={{ color: C.text }}>{er.entry_zone}</strong></div>
+            {er.stop_zone && <div>Стоп: <strong style={{ color: C.red }}>{er.stop_zone}</strong></div>}
+            <div>Риск: <strong style={{ color: riskColor }}>{er.risk_level === "низкий" ? "🟢 Низкий" : er.risk_level === "высокий" ? "🔴 Высокий" : "🟡 Средний"}</strong></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main app ─────────────────────────────────────────────────────────────────
 export default function App() {
   // Asset selection
@@ -291,6 +358,8 @@ export default function App() {
   // Trade flow: idle → signal → confirmed → result_shown
   const [flowStep,    setFlowStep]    = useState("idle");
   const [signalData,  setSignalData]  = useState(null);
+  const [detailsData, setDetailsData] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [tradeId,     setTradeId]     = useState(null);
   const [isScanner,   setIsScanner]   = useState(false);
   const [dogonStep,   setDogonStep]   = useState(0);
@@ -305,6 +374,17 @@ export default function App() {
 
   // History tab
   const [historyData, setHistoryData] = useState(null);
+  const [historyModeFilter,   setHistoryModeFilter]   = useState("all");
+  const [historyResultFilter, setHistoryResultFilter] = useState("all");
+  const [historyPage,         setHistoryPage]         = useState(0);
+  const [historyHasMore,      setHistoryHasMore]      = useState(false);
+
+  // Session tab
+  const [sessionData,     setSessionData]     = useState(null);
+  const [sessionDeposit,  setSessionDeposit]  = useState("1000");
+  const [sessionRisk,     setSessionRisk]     = useState("5");
+  const [sessionMaxMart,  setSessionMaxMart]  = useState(3);
+  const [sessionLoading,  setSessionLoading]  = useState(false);
 
   // News tab
   const [newsData,           setNewsData]           = useState(null);
@@ -322,7 +402,12 @@ export default function App() {
 
   // Load history when tab opens
   useEffect(() => {
-    if (activeTab === "history") fetchHistory();
+    if (activeTab === "history") fetchHistory(true);
+  }, [activeTab]);
+
+  // Load session when tab opens
+  useEffect(() => {
+    if (activeTab === "session") fetchCurrentSession();
   }, [activeTab]);
 
   // News indicator — refresh when symbol changes
@@ -384,11 +469,56 @@ export default function App() {
     } catch (_) {}
   }
 
-  async function fetchHistory() {
+  async function fetchHistory(reset = true) {
+    const page = reset ? 0 : historyPage;
+    if (reset) setHistoryPage(0);
     try {
-      const res = await fetch(`${API}/history`);
-      setHistoryData(await res.json());
+      const mode   = historyModeFilter   !== "all" ? `&mode=${historyModeFilter}`   : "";
+      const result = historyResultFilter !== "all" ? `&result=${historyResultFilter}` : "";
+      const res    = await fetch(`${API}/history?limit=20&offset=${page*20}${mode}${result}`);
+      const d      = await res.json();
+      if (reset) {
+        setHistoryData(d);
+      } else {
+        setHistoryData(prev => prev ? {
+          ...d,
+          history: [...(prev.history || []), ...(d.history || [])],
+        } : d);
+      }
+      setHistoryHasMore((d.history?.length || 0) >= 20);
+      if (!reset) setHistoryPage(p => p + 1);
     } catch (_) {}
+  }
+
+  async function fetchCurrentSession() {
+    try {
+      const res = await fetch(`${API}/session/current`);
+      const d   = await res.json();
+      setSessionData(d.active === false ? null : d);
+    } catch (_) {}
+  }
+
+  async function startSession() {
+    setSessionLoading(true);
+    try {
+      await fetch(`${API}/session/start`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deposit: parseFloat(sessionDeposit), risk_pct: parseFloat(sessionRisk), max_martingale: sessionMaxMart }),
+      });
+      await fetchCurrentSession();
+    } catch (_) {} finally { setSessionLoading(false); }
+  }
+
+  async function endSession() {
+    if (!sessionData?.id) return;
+    setSessionLoading(true);
+    try {
+      await fetch(`${API}/session/end`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionData.id }),
+      });
+      setSessionData(null);
+    } catch (_) {} finally { setSessionLoading(false); }
   }
 
   async function fetchNewsTab() {
@@ -471,6 +601,17 @@ export default function App() {
       setSignalData(data);
       setFlowStep("signal");
       if (data.signal === "UP" || data.signal === "DOWN") playSound("signal");
+      // Kick off detailed analysis in background for real signals
+      if (data.signal === "UP" || data.signal === "DOWN") {
+        setDetailsData(null);
+        setDetailsLoading(true);
+        fetch(`${API}/signal/details`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol, timeframe, mode }),
+        }).then(r => r.json()).then(d => { setDetailsData(d); setDetailsLoading(false); })
+          .catch(() => setDetailsLoading(false));
+      }
     } catch (_) {
       setSignalData({
         signal: "ERROR", confidence: 0,
@@ -495,6 +636,8 @@ export default function App() {
   }
 
   function handleSkip() {
+    setDetailsData(null);
+    setDetailsLoading(false);
     setSignalData(null);
     setFlowStep("idle");
   }
@@ -510,6 +653,8 @@ export default function App() {
     setTimeout(() => setWinFlash(false), 1800);
     setDogonStep(0);
     setSessionStopped(false);
+    setDetailsData(null);
+    setDetailsLoading(false);
     setSignalData(null);
     setTradeId(null);
     setFlowStep("idle");
@@ -518,6 +663,8 @@ export default function App() {
   async function handleLoss() {
     if (tradeId) await postHistoryUpdate(tradeId, "LOSS");
     const next = dogonStep + 1;
+    setDetailsData(null);
+    setDetailsLoading(false);
     setTradeId(null);
     setSignalData(null);
     if (next > 3) {
@@ -534,6 +681,8 @@ export default function App() {
   function resetSession() {
     setDogonStep(0);
     setSessionStopped(false);
+    setDetailsData(null);
+    setDetailsLoading(false);
     setSignalData(null);
     setTradeId(null);
     setFlowStep("idle");
@@ -662,7 +811,7 @@ export default function App() {
 
         {/* ── Tabs ── */}
         <div style={{ display: "flex", gap: "6px" }}>
-          {[["signal", "Сигнал"], ["scanner", "AI Сканер"], ["history", "История"], ["news", "📰 Новости"]].map(([tab, label]) => (
+          {[["signal", "Сигнал"], ["scanner", "AI Сканер"], ["session", "📈 Сессия"], ["history", "История"], ["news", "📰"]].map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               flex: 1, padding: "10px 4px", borderRadius: "12px", border: "none",
               background: activeTab === tab ? C.primary : C.card,
@@ -844,6 +993,20 @@ export default function App() {
                       </div>
                       <PriceRow label="📍 Точка входа" value={signalData.entry_price} />
                       <ReasonsBox reasons={signalData.reasons} />
+                      {/* Detailed analysis — loads in background */}
+                      {activeIsReal && (detailsLoading || detailsData) && (
+                        <div style={{ marginTop: "12px" }}>
+                          {detailsLoading && !detailsData && (
+                            <div style={{ color: C.muted, fontSize: "12px", textAlign: "center", padding: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>🔍</span>
+                              Загружаю детальный анализ...
+                            </div>
+                          )}
+                          {detailsData && !detailsData.error && (
+                            <DetailsPanel data={detailsData} signalData={signalData} />
+                          )}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -1055,6 +1218,133 @@ export default function App() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════
+            SESSION TAB
+        ════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "session" && (
+          <>
+            {!sessionData ? (
+              /* Start session screen */
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
+                <div style={{ color: C.text, fontWeight: 800, fontSize: "16px", marginBottom: "16px", textAlign: "center" }}>📈 Торговая сессия</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div>
+                    <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", marginBottom: "5px" }}>Депозит ($)</div>
+                    <input type="number" value={sessionDeposit} onChange={e => setSessionDeposit(e.target.value)}
+                      style={{ width: "100%", background: C.input, color: C.text, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 14px", outline: "none", fontSize: "15px", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", marginBottom: "5px" }}>Риск на сделку (%)</div>
+                    <input type="number" value={sessionRisk} onChange={e => setSessionRisk(e.target.value)}
+                      style={{ width: "100%", background: C.input, color: C.text, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 14px", outline: "none", fontSize: "15px", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", marginBottom: "5px" }}>Макс. догонов</div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {[1,2,3].map(n => (
+                        <button key={n} onClick={() => setSessionMaxMart(n)} style={{
+                          flex:1, padding:"10px", borderRadius:"10px", fontWeight:700, fontSize:"14px", cursor:"pointer",
+                          border: sessionMaxMart===n ? "1px solid rgba(59,130,246,0.5)" : `1px solid ${C.border}`,
+                          background: sessionMaxMart===n ? "rgba(59,130,246,0.15)" : C.input,
+                          color: sessionMaxMart===n ? "#7fb0ff" : C.muted,
+                        }}>{n}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Trade size preview */}
+                  {sessionDeposit && sessionRisk && (
+                    <div style={{ background: C.input, borderRadius: "10px", padding: "10px 12px", border: `1px solid ${C.border}` }}>
+                      <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", marginBottom: "6px" }}>Размер сделок</div>
+                      {[0,1,2,3].slice(0, sessionMaxMart+1).map(step => {
+                        const base = parseFloat(sessionDeposit) * parseFloat(sessionRisk) / 100;
+                        const size = base * Math.pow(2, step);
+                        return (
+                          <div key={step} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: step===0 ? C.text : C.orange, marginBottom: "2px" }}>
+                            <span>{step === 0 ? "Базовая" : `Догон ${step}`}</span>
+                            <strong>${size.toFixed(2)}</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button onClick={startSession} disabled={sessionLoading} style={{
+                    width: "100%", padding: "16px", borderRadius: "12px", border: "none",
+                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    color: "#fff", fontWeight: 800, fontSize: "15px", cursor: "pointer",
+                    opacity: sessionLoading ? 0.7 : 1,
+                  }}>🚀 {sessionLoading ? "Запускаю..." : "НАЧАТЬ СЕССИЮ"}</button>
+                </div>
+              </div>
+            ) : (
+              /* Active session screen */
+              <>
+                <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "16px", padding: "18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                    <div style={{ color: C.green, fontWeight: 800, fontSize: "14px" }}>🟢 СЕССИЯ АКТИВНА</div>
+                    <div style={{ color: C.muted, fontSize: "12px" }}>
+                      {sessionData.started_at ? new Date(sessionData.started_at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
+                    <div style={{ background: C.input, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                      <div style={{ color: C.green, fontSize: "20px", fontWeight: 800 }}>{sessionData.wins || 0}</div>
+                      <div style={{ color: C.muted, fontSize: "11px" }}>✅ Выиграно</div>
+                    </div>
+                    <div style={{ background: C.input, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                      <div style={{ color: C.red, fontSize: "20px", fontWeight: 800 }}>{sessionData.losses || 0}</div>
+                      <div style={{ color: C.muted, fontSize: "11px" }}>❌ Проиграно</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
+                    <span style={{ color: C.muted, fontSize: "13px" }}>Win Rate</span>
+                    <strong style={{ color: C.green, fontSize: "13px" }}>
+                      {(sessionData.wins||0)+(sessionData.losses||0) > 0
+                        ? Math.round((sessionData.wins||0)/((sessionData.wins||0)+(sessionData.losses||0))*100) + "%"
+                        : "—"}
+                    </strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "14px" }}>
+                    <span style={{ color: C.muted, fontSize: "13px" }}>P&L</span>
+                    <strong style={{ color: (sessionData.pnl||0) >= 0 ? C.green : C.red, fontSize: "13px" }}>
+                      {(sessionData.pnl||0) >= 0 ? "+" : ""}${(sessionData.pnl||0).toFixed(2)}
+                    </strong>
+                  </div>
+                  {/* Next trade size */}
+                  {sessionData.deposit && sessionData.risk_pct && (
+                    <div style={{ background: C.input, borderRadius: "10px", padding: "10px 12px", marginBottom: "14px" }}>
+                      <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", marginBottom: "4px" }}>Следующая сделка</div>
+                      {(() => {
+                        const base = sessionData.deposit * sessionData.risk_pct / 100;
+                        const step = dogonStep;
+                        const size = base * Math.pow(2, step);
+                        return (
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ color: C.muted, fontSize: "12px" }}>{step === 0 ? "Базовая" : `Догон ${step}`}</span>
+                            <strong style={{ color: step === 0 ? C.text : C.orange, fontSize: "14px" }}>${size.toFixed(2)}</strong>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={fetchCurrentSession} style={{
+                      flex:1, padding:"12px", borderRadius:"10px",
+                      border:`1px solid ${C.border}`, background:C.card,
+                      color:C.muted, fontWeight:600, fontSize:"13px", cursor:"pointer",
+                    }}>🔄 Обновить</button>
+                    <button onClick={endSession} disabled={sessionLoading} style={{
+                      flex:1, padding:"12px", borderRadius:"10px",
+                      border:"1px solid rgba(239,68,68,0.4)", background:"rgba(239,68,68,0.1)",
+                      color:C.red, fontWeight:700, fontSize:"13px", cursor:"pointer",
+                      opacity: sessionLoading ? 0.7 : 1,
+                    }}>🛑 Завершить</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
             HISTORY TAB
         ════════════════════════════════════════════════════════════════════ */}
         {activeTab === "history" && (
@@ -1062,27 +1352,14 @@ export default function App() {
             {/* Stats */}
             {historyData?.stats && (
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px" }}>
-                <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "12px" }}>
-                  Статистика Win Rate
-                </div>
+                <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "12px" }}>Статистика Win Rate</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", textAlign: "center", marginBottom: "14px" }}>
-                  <div>
-                    <div style={{ color: C.green, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate}%</div>
-                    <div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>Общий</div>
-                  </div>
-                  <div>
-                    <div style={{ color: C.primary, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate_manual}%</div>
-                    <div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>Ручной</div>
-                  </div>
-                  <div>
-                    <div style={{ color: C.purple, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate_ai}%</div>
-                    <div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>AI Сканер</div>
-                  </div>
+                  <div><div style={{ color: C.green, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate}%</div><div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>Общий</div></div>
+                  <div><div style={{ color: C.primary, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate_manual}%</div><div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>Ручной</div></div>
+                  <div><div style={{ color: C.purple, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate_ai}%</div><div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>AI Сканер</div></div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-around", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
-                  <span style={{ color: C.muted, fontSize: "12px" }}>
-                    Всего: <strong style={{ color: C.text }}>{historyData.stats.total}</strong>
-                  </span>
+                  <span style={{ color: C.muted, fontSize: "12px" }}>Всего: <strong style={{ color: C.text }}>{historyData.stats.total}</strong></span>
                   <span style={{ color: C.green, fontSize: "12px" }}>✅ {historyData.stats.wins}</span>
                   <span style={{ color: C.red,   fontSize: "12px" }}>❌ {historyData.stats.losses}</span>
                   {historyData.stats.streak > 0 && (
@@ -1094,10 +1371,28 @@ export default function App() {
               </div>
             )}
 
+            {/* Filters */}
+            <div style={{ display: "flex", gap: "6px" }}>
+              {[["all","Все"], ["manual","Ручной"], ["ai_scanner","AI Сканер"]].map(([v,l]) => (
+                <button key={v} onClick={() => { setHistoryModeFilter(v); fetchHistory(true); }} style={{
+                  flex:1, padding:"8px 4px", borderRadius:"10px", border:"none", fontWeight:700, fontSize:"12px", cursor:"pointer",
+                  background: historyModeFilter===v ? C.primary : C.card, color:"#fff",
+                }}>{l}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              {[["all","Все"], ["WIN","Выиграл"], ["LOSS","Проиграл"]].map(([v,l]) => (
+                <button key={v} onClick={() => { setHistoryResultFilter(v); fetchHistory(true); }} style={{
+                  flex:1, padding:"8px 4px", borderRadius:"10px", border:"none", fontWeight:700, fontSize:"12px", cursor:"pointer",
+                  background: historyResultFilter===v ? (v==="WIN"?C.green:v==="LOSS"?C.red:C.primary) : C.card, color:"#fff",
+                }}>{l}</button>
+              ))}
+            </div>
+
             {/* Trade list */}
             {historyData?.history?.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {[...historyData.history].reverse().map((trade, idx) => (
+                {historyData.history.map((trade, idx) => (
                   <TradeCard key={trade.trade_id || idx} trade={trade} />
                 ))}
               </div>
@@ -1107,13 +1402,19 @@ export default function App() {
               </div>
             )}
 
-            <button onClick={fetchHistory} style={{
-              width: "100%", padding: "12px", borderRadius: "12px",
-              border: `1px solid ${C.border}`, background: C.card,
-              color: C.muted, fontWeight: 600, fontSize: "13px", cursor: "pointer",
-            }}>
-              Обновить
-            </button>
+            {historyHasMore && (
+              <button onClick={() => fetchHistory(false)} style={{
+                width:"100%", padding:"12px", borderRadius:"12px",
+                border:`1px solid ${C.border}`, background:C.card,
+                color:C.muted, fontWeight:600, fontSize:"13px", cursor:"pointer",
+              }}>Загрузить ещё</button>
+            )}
+
+            <button onClick={() => fetchHistory(true)} style={{
+              width:"100%", padding:"12px", borderRadius:"12px",
+              border:`1px solid ${C.border}`, background:C.card,
+              color:C.muted, fontWeight:600, fontSize:"13px", cursor:"pointer",
+            }}>Обновить</button>
           </>
         )}
 

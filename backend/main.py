@@ -378,33 +378,271 @@ def get_higher_trend(df_higher: pd.DataFrame) -> str:
 
 
 def detect_candle_pattern(df: pd.DataFrame) -> tuple:
-    if len(df) < 2:
+    if len(df) < 3:
         return "none", "neutral"
-    curr = df.iloc[-1]
-    prev = df.iloc[-2]
-    body_curr  = abs(float(curr["close"]) - float(curr["open"]))
-    range_curr = float(curr["high"]) - float(curr["low"])
-    if range_curr == 0:
-        return "none", "neutral"
-    if body_curr / range_curr < 0.1:
+    c3 = df.iloc[-3]; c2 = df.iloc[-2]; c1 = df.iloc[-1]
+    def is_bull(c): return float(c['close']) > float(c['open'])
+    def is_bear(c): return float(c['close']) < float(c['open'])
+    def body(c): return abs(float(c['close']) - float(c['open']))
+    def rng(c):  return float(c['high']) - float(c['low'])
+    def usha(c): return float(c['high']) - max(float(c['open']), float(c['close']))
+    def lsha(c): return min(float(c['open']), float(c['close'])) - float(c['low'])
+
+    # Doji
+    if rng(c1) > 0 and body(c1) / rng(c1) < 0.1:
         return "Doji (неопределённость)", "neutral"
-    if (float(prev["close"]) < float(prev["open"]) and
-            float(curr["close"]) > float(curr["open"]) and
-            float(curr["close"]) > float(prev["open"]) and
-            float(curr["open"]) < float(prev["close"])):
+    # Bullish Marubozu
+    if is_bull(c1) and rng(c1) > 0 and usha(c1) < body(c1)*0.05 and lsha(c1) < body(c1)*0.05:
+        return "Бычье марибозу (сильный рост)", "up"
+    # Bearish Marubozu
+    if is_bear(c1) and rng(c1) > 0 and usha(c1) < body(c1)*0.05 and lsha(c1) < body(c1)*0.05:
+        return "Медвежье марибозу (сильное падение)", "down"
+    # Three White Soldiers
+    if is_bull(c3) and is_bull(c2) and is_bull(c1):
+        if float(c2['close'])>float(c3['close']) and float(c1['close'])>float(c2['close']):
+            if float(c2['open'])>float(c3['open']) and float(c1['open'])>float(c2['open']):
+                return "Три белых солдата (сильный рост)", "up"
+    # Three Black Crows
+    if is_bear(c3) and is_bear(c2) and is_bear(c1):
+        if float(c2['close'])<float(c3['close']) and float(c1['close'])<float(c2['close']):
+            if float(c2['open'])<float(c3['open']) and float(c1['open'])<float(c2['open']):
+                return "Три чёрных вороны (сильное падение)", "down"
+    # Morning Star
+    mid_c3 = (float(c3['open'])+float(c3['close']))/2
+    if is_bear(c3) and body(c3)>body(c2)*2 and body(c2)<body(c3)*0.3 and is_bull(c1) and float(c1['close'])>mid_c3:
+        return "Утренняя звезда (разворот вверх)", "up"
+    # Evening Star
+    mid_c3b = (float(c3['open'])+float(c3['close']))/2
+    if is_bull(c3) and body(c3)>body(c2)*2 and body(c2)<body(c3)*0.3 and is_bear(c1) and float(c1['close'])<mid_c3b:
+        return "Вечерняя звезда (разворот вниз)", "down"
+    # Bullish Engulfing
+    if is_bear(c2) and is_bull(c1) and float(c1['close'])>float(c2['open']) and float(c1['open'])<float(c2['close']):
         return "Бычье поглощение", "up"
-    if (float(prev["close"]) > float(prev["open"]) and
-            float(curr["close"]) < float(curr["open"]) and
-            float(curr["close"]) < float(prev["open"]) and
-            float(curr["open"]) > float(prev["close"])):
+    # Bearish Engulfing
+    if is_bull(c2) and is_bear(c1) and float(c1['close'])<float(c2['open']) and float(c1['open'])>float(c2['close']):
         return "Медвежье поглощение", "down"
-    lower_shadow = float(min(curr["open"], curr["close"])) - float(curr["low"])
-    upper_shadow = float(curr["high"]) - float(max(curr["open"], curr["close"]))
-    if lower_shadow > body_curr * 2 and upper_shadow < body_curr * 0.5:
-        return "Молот (разворот вверх)", "up"
-    if upper_shadow > body_curr * 2 and lower_shadow < body_curr * 0.5:
+    # Bullish Harami
+    if is_bear(c2) and is_bull(c1) and float(c1['close'])<float(c2['open']) and float(c1['open'])>float(c2['close']):
+        return "Бычье харами (разворот вверх)", "up"
+    # Bearish Harami
+    if is_bull(c2) and is_bear(c1) and float(c1['close'])>float(c2['open']) and float(c1['open'])<float(c2['close']):
+        return "Медвежье харами (разворот вниз)", "down"
+    # Piercing Line
+    mid_c2 = (float(c2['open'])+float(c2['close']))/2
+    if is_bear(c2) and is_bull(c1) and float(c1['open'])<float(c2['close']) and float(c1['close'])>mid_c2:
+        return "Пронизывающая линия (бычий разворот)", "up"
+    # Dark Cloud Cover
+    mid_c2b = (float(c2['open'])+float(c2['close']))/2
+    if is_bull(c2) and is_bear(c1) and float(c1['open'])>float(c2['close']) and float(c1['close'])<mid_c2b:
+        return "Завеса из тёмных облаков (медвежий разворот)", "down"
+    # Hammer
+    if lsha(c1) > body(c1)*2 and usha(c1) < body(c1)*0.5:
+        if is_bear(c2) or is_bear(c3):
+            return "Молот (разворот вверх)", "up"
+    # Hanging Man
+    if lsha(c1) > body(c1)*2 and usha(c1) < body(c1)*0.5:
+        if is_bull(c2) and is_bull(c3):
+            return "Повешенный (разворот вниз)", "down"
+    # Inverted Hammer
+    if usha(c1) > body(c1)*2 and lsha(c1) < body(c1)*0.5 and is_bull(c1):
+        return "Перевёрнутый молот (разворот вверх)", "up"
+    # Shooting Star
+    if usha(c1) > body(c1)*2 and lsha(c1) < body(c1)*0.5 and is_bear(c1):
         return "Падающая звезда (разворот вниз)", "down"
     return "none", "neutral"
+
+
+def find_support_resistance(df: pd.DataFrame, window: int = 15) -> dict:
+    """Find key support/resistance levels using local extremes + clustering."""
+    if len(df) < window * 2 + 1:
+        return {"support_levels": [], "resistance_levels": [],
+                "nearest_support": None, "nearest_resistance": None,
+                "distance_to_support_pct": None, "distance_to_resistance_pct": None}
+    resistances, supports = [], []
+    for i in range(window, len(df) - window):
+        hi = float(df['high'].iloc[i])
+        lo = float(df['low'].iloc[i])
+        if hi == float(df['high'].iloc[i-window:i+window].max()):
+            resistances.append(hi)
+        if lo == float(df['low'].iloc[i-window:i+window].min()):
+            supports.append(lo)
+
+    def cluster(lvls):
+        if not lvls: return []
+        lvls = sorted(lvls)
+        clusters, cur = [], [lvls[0]]
+        for v in lvls[1:]:
+            if cur and abs(v - cur[-1]) / max(cur[-1], 1e-10) < 0.001:
+                cur.append(v)
+            else:
+                clusters.append(round(sum(cur)/len(cur), 5)); cur = [v]
+        clusters.append(round(sum(cur)/len(cur), 5))
+        return clusters
+
+    current = float(df['close'].iloc[-1])
+    res_cl  = cluster(resistances)
+    sup_cl  = cluster(supports)
+    above   = sorted([r for r in res_cl if r > current])[:3]
+    below   = sorted([s for s in sup_cl if s < current], reverse=True)[:3]
+    nearest_r = above[0] if above else None
+    nearest_s = below[0] if below else None
+    return {
+        "resistance_levels": above,
+        "support_levels":    below,
+        "nearest_resistance": nearest_r,
+        "nearest_support":    nearest_s,
+        "distance_to_resistance_pct": round((nearest_r - current)/current*100, 3) if nearest_r else None,
+        "distance_to_support_pct":    round((current - nearest_s)/current*100, 3) if nearest_s else None,
+    }
+
+
+def detect_chart_patterns(df: pd.DataFrame) -> dict:
+    """Detect classical TA chart patterns."""
+    null_result = {"pattern_name": None, "pattern_type": "neutral", "confidence": 0,
+                   "description": "", "target_price": None}
+    if len(df) < 30:
+        return null_result
+
+    h = df['high'].values.astype(float)
+    l = df['low'].values.astype(float)
+    c = df['close'].values.astype(float)
+    n = min(50, len(df))
+    h, l, c = h[-n:], l[-n:], c[-n:]
+    current = c[-1]
+
+    def peaks(arr, w=5):
+        return [(i, float(arr[i])) for i in range(w, len(arr)-w)
+                if arr[i] == arr[i-w:i+w+1].max()]
+    def troughs(arr, w=5):
+        return [(i, float(arr[i])) for i in range(w, len(arr)-w)
+                if arr[i] == arr[i-w:i+w+1].min()]
+
+    pks = peaks(h); trs = troughs(l)
+
+    # Double Top
+    if len(pks) >= 2:
+        p1, p2 = pks[-2], pks[-1]
+        if abs(p1[1]-p2[1])/max(p1[1],1e-10) < 0.003 and p2[0] > p1[0]:
+            neck = float(min(l[p1[0]:p2[0]+1])) if p2[0] > p1[0] else l[p1[0]]
+            return {"pattern_name": "Двойная вершина", "pattern_type": "bearish",
+                    "confidence": 72, "description": "Два пика на одном уровне — разворот вниз",
+                    "target_price": round(neck-(p1[1]-neck), 5)}
+    # Double Bottom
+    if len(trs) >= 2:
+        t1, t2 = trs[-2], trs[-1]
+        if abs(t1[1]-t2[1])/max(t1[1],1e-10) < 0.003 and t2[0] > t1[0]:
+            neck = float(max(h[t1[0]:t2[0]+1])) if t2[0] > t1[0] else h[t1[0]]
+            return {"pattern_name": "Двойное дно", "pattern_type": "bullish",
+                    "confidence": 72, "description": "Два дна на одном уровне — разворот вверх",
+                    "target_price": round(neck+(neck-t1[1]), 5)}
+    # H&S
+    if len(pks) >= 3:
+        p1, p2, p3 = pks[-3], pks[-2], pks[-1]
+        if p2[1]>p1[1] and p2[1]>p3[1] and abs(p1[1]-p3[1])/max(p2[1],1e-10) < 0.02:
+            neck = float(min(l[p1[0]:p3[0]+1])) if p3[0] > p1[0] else l[p1[0]]
+            return {"pattern_name": "Голова и плечи", "pattern_type": "bearish",
+                    "confidence": 78, "description": "Центральный пик выше боковых — медвежий разворот",
+                    "target_price": round(neck-(p2[1]-neck), 5)}
+    # Inverse H&S
+    if len(trs) >= 3:
+        t1, t2, t3 = trs[-3], trs[-2], trs[-1]
+        if t2[1]<t1[1] and t2[1]<t3[1] and abs(t1[1]-t3[1])/max(abs(t2[1]),1e-10) < 0.02:
+            neck = float(max(h[t1[0]:t3[0]+1])) if t3[0] > t1[0] else h[t1[0]]
+            return {"pattern_name": "Обратные голова и плечи", "pattern_type": "bullish",
+                    "confidence": 78, "description": "Центральное дно ниже боковых — бычий разворот",
+                    "target_price": round(neck+(neck-t2[1]), 5)}
+    # Ascending Triangle
+    if len(pks) >= 2 and len(trs) >= 2:
+        if abs(pks[-1][1]-pks[-2][1])/max(pks[-1][1],1e-10) < 0.005 and trs[-1][1] > trs[-2][1]:
+            return {"pattern_name": "Восходящий треугольник", "pattern_type": "bullish",
+                    "confidence": 65, "description": "Горизонтальное сопротивление + растущая поддержка — пробой вверх",
+                    "target_price": round(float(pks[-1][1]), 5)}
+        if abs(trs[-1][1]-trs[-2][1])/max(trs[-1][1],1e-10) < 0.005 and pks[-1][1] < pks[-2][1]:
+            return {"pattern_name": "Нисходящий треугольник", "pattern_type": "bearish",
+                    "confidence": 65, "description": "Горизонтальная поддержка + падающее сопротивление — пробой вниз",
+                    "target_price": round(float(trs[-1][1]), 5)}
+    # Flag
+    if len(c) >= 30:
+        prior_move  = c[-10] - c[-30]
+        recent_rng  = (max(h[-10:]) - min(l[-10:])) / max(current, 1e-10)
+        prior_rng   = (max(h[-30:-10]) - min(l[-30:-10])) / max(current, 1e-10)
+        if prior_rng > 0.005 and recent_rng < prior_rng * 0.4:
+            if prior_move > 0:
+                return {"pattern_name": "Бычий флаг", "pattern_type": "bullish",
+                        "confidence": 60, "description": "Консолидация после роста — продолжение вверх",
+                        "target_price": round(current+abs(prior_move), 5)}
+            else:
+                return {"pattern_name": "Медвежий флаг", "pattern_type": "bearish",
+                        "confidence": 60, "description": "Консолидация после падения — продолжение вниз",
+                        "target_price": round(current-abs(prior_move), 5)}
+    return null_result
+
+
+def analyze_trend_strength(df: pd.DataFrame) -> dict:
+    """Analyze trend direction and strength using ADX."""
+    df2 = df.copy()
+    try:
+        adx_result = ta.adx(df2['high'], df2['low'], df2['close'], length=14)
+        adx_col = [c for c in adx_result.columns if c.startswith('ADX_')]
+        adx_val = float(adx_result[adx_col[0]].iloc[-1]) if adx_col else 0.0
+        if pd.isna(adx_val): adx_val = 0.0
+    except Exception:
+        adx_val = 0.0
+
+    ema9  = ta.ema(df2['close'], length=9)
+    ema21 = ta.ema(df2['close'], length=21)
+    direction = "sideways"
+    if not ema9.empty and not ema21.empty:
+        if float(ema9.iloc[-1]) > float(ema21.iloc[-1]):   direction = "up"
+        elif float(ema9.iloc[-1]) < float(ema21.iloc[-1]): direction = "down"
+
+    closes = df2['close'].values.astype(float)
+    bars_in_trend = 1
+    if direction == "up":
+        for i in range(len(closes)-2, max(len(closes)-30,0), -1):
+            if closes[i] < closes[i-1]: break
+            bars_in_trend += 1
+    elif direction == "down":
+        for i in range(len(closes)-2, max(len(closes)-30,0), -1):
+            if closes[i] > closes[i-1]: break
+            bars_in_trend += 1
+
+    if adx_val > 40:   strength = "strong"
+    elif adx_val > 20: strength = "moderate"
+    else:              strength, direction = "weak", "sideways"
+
+    return {"direction": direction, "strength": strength,
+            "adx_value": round(adx_val, 1), "bars_in_trend": bars_in_trend}
+
+
+def calculate_fibonacci(df: pd.DataFrame) -> dict:
+    """Calculate Fibonacci retracement levels from last 50-bar swing."""
+    null_result = {"fib_236": None, "fib_382": None, "fib_500": None,
+                   "fib_618": None, "fib_786": None,
+                   "nearest_level_name": None, "nearest_level_price": None, "all_levels": {}}
+    if len(df) < 20: return null_result
+    n = min(50, len(df))
+    swing_high = float(df['high'].iloc[-n:].max())
+    swing_low  = float(df['low'].iloc[-n:].min())
+    diff = swing_high - swing_low
+    if diff < 1e-10: return null_result
+    current = float(df['close'].iloc[-1])
+    levels = {
+        "0%":    round(swing_high, 5),
+        "23.6%": round(swing_high - diff*0.236, 5),
+        "38.2%": round(swing_high - diff*0.382, 5),
+        "50%":   round(swing_high - diff*0.500, 5),
+        "61.8%": round(swing_high - diff*0.618, 5),
+        "78.6%": round(swing_high - diff*0.786, 5),
+        "100%":  round(swing_low, 5),
+    }
+    nearest_name  = min(levels, key=lambda k: abs(levels[k]-current))
+    nearest_price = levels[nearest_name]
+    return {"fib_236": levels["23.6%"], "fib_382": levels["38.2%"],
+            "fib_500": levels["50%"],   "fib_618": levels["61.8%"],
+            "fib_786": levels["78.6%"],
+            "nearest_level_name": nearest_name, "nearest_level_price": nearest_price,
+            "all_levels": levels}
 
 
 def analyze(df: pd.DataFrame, higher_trend: str = "neutral", mode: str = "Уверенный") -> dict:
@@ -581,40 +819,43 @@ def root():
 
 
 @app.get("/history")
-def get_history():
+def get_history(limit: int = 20, offset: int = 0,
+                mode: str | None = None, result: str | None = None,
+                symbol: str | None = None):
     history = load_history()
-    # Only show entries created by the new flow (have trade_id)
     history = [e for e in history if e.get("trade_id")]
-    finished  = [e for e in history if e.get("result") in ("WIN", "LOSS")]
+
+    # Filters
+    if mode:   history = [e for e in history if e.get("mode") == mode]
+    if result: history = [e for e in history if e.get("result") == result]
+    if symbol: history = [e for e in history if e.get("symbol") == symbol]
+
+    total = len(history)
+    finished  = [e for e in history if e.get("result") in ("WIN","LOSS")]
     manual_f  = [e for e in finished if e.get("mode") == "manual"]
     ai_f      = [e for e in finished if e.get("mode") == "ai_scanner"]
 
     def wr(lst):
-        if not lst:
-            return 0.0
+        if not lst: return 0.0
         wins = sum(1 for e in lst if e["result"] == "WIN")
-        return round(wins / len(lst) * 100, 1)
+        return round(wins/len(lst)*100, 1)
 
-    streak = 0
-    streak_type = None
+    streak, streak_type = 0, None
     for e in reversed(finished):
-        if streak_type is None:
-            streak_type = e["result"]
-            streak = 1
-        elif e["result"] == streak_type:
-            streak += 1
-        else:
-            break
+        if streak_type is None: streak_type = e["result"]; streak = 1
+        elif e["result"] == streak_type: streak += 1
+        else: break
 
+    page = list(reversed(history))[offset:offset+limit]
     return {
-        "history":  history[-30:],
+        "history":  page,
+        "total":    total,
         "win_rate": wr(finished),
-        "total":    len(history),
         "stats": {
             "win_rate":        wr(finished),
             "win_rate_manual": wr(manual_f),
             "win_rate_ai":     wr(ai_f),
-            "total":           len(history),
+            "total":           total,
             "wins":            sum(1 for e in finished if e["result"] == "WIN"),
             "losses":          sum(1 for e in finished if e["result"] == "LOSS"),
             "pending":         sum(1 for e in history if e.get("result") == "PENDING"),
@@ -646,7 +887,6 @@ def add_history_entry(payload: HistoryAddRequest):
         "market_type":     payload.market_type,
         "timestamp":       datetime.now(timezone.utc).isoformat(),
     })
-    history = history[-100:]
     save_history(history)
     return {"ok": True}
 
@@ -763,6 +1003,211 @@ def scan_all_timeframes(payload: SignalRequest):
 @app.get("/price")
 def get_price(symbol: str):
     return {"symbol": symbol, "price": get_current_price(symbol)}
+
+
+@app.post("/signal/details")
+def get_signal_details(payload: SignalRequest):
+    """Detailed technical analysis — runs after fast /signal."""
+    try:
+        df = get_candles(payload.symbol, payload.timeframe, higher=False)
+        sr          = find_support_resistance(df)
+        fib         = calculate_fibonacci(df)
+        trend       = analyze_trend_strength(df)
+        chart_pat   = detect_chart_patterns(df)
+        current     = float(df['close'].iloc[-1]) if not df.empty else None
+        risk_level  = "средний"
+        if sr.get('distance_to_support_pct') is not None:
+            d = sr['distance_to_support_pct']
+            risk_level = "низкий" if d < 0.3 else "высокий" if d > 0.7 else "средний"
+        entry_rec = None
+        if current:
+            entry_rec = {
+                "optimal_entry": current,
+                "entry_zone":    f"{round(current*0.9999,5)} — {round(current*1.0001,5)}",
+                "stop_zone":     f"ниже {sr['nearest_support']}" if sr.get('nearest_support') else "—",
+                "risk_level":    risk_level,
+            }
+        return {
+            "symbol":              payload.symbol,
+            "timeframe":           payload.timeframe,
+            "support_resistance":  sr,
+            "fibonacci":           fib,
+            "trend":               trend,
+            "chart_pattern":       chart_pat,
+            "entry_recommendation": entry_rec,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/history/stats")
+def get_history_stats():
+    history = load_history()
+    history = [e for e in history if e.get("trade_id")]
+    finished = [e for e in history if e.get("result") in ("WIN","LOSS")]
+
+    def wr(lst):
+        if not lst: return 0.0
+        return round(sum(1 for e in lst if e["result"]=="WIN")/len(lst)*100, 1)
+
+    # Best/worst symbol
+    from collections import defaultdict
+    sym_stats = defaultdict(lambda: {"w":0,"l":0})
+    for e in finished:
+        sym = e.get("symbol","?")
+        if e["result"] == "WIN": sym_stats[sym]["w"] += 1
+        else:                    sym_stats[sym]["l"] += 1
+    best_sym  = max(sym_stats, key=lambda s: sym_stats[s]["w"]/(sym_stats[s]["w"]+sym_stats[s]["l"]), default=None)
+    worst_sym = min(sym_stats, key=lambda s: sym_stats[s]["w"]/(sym_stats[s]["w"]+sym_stats[s]["l"]), default=None)
+
+    # Streaks
+    cur_streak, cur_type = 0, None
+    for e in reversed(finished):
+        if cur_type is None: cur_type = e["result"]; cur_streak = 1
+        elif e["result"] == cur_type: cur_streak += 1
+        else: break
+
+    max_win_streak = max_loss_streak = 0
+    cur_w = cur_l = 0
+    for e in finished:
+        if e["result"]=="WIN":  cur_w += 1; cur_l = 0
+        else:                   cur_l += 1; cur_w = 0
+        max_win_streak  = max(max_win_streak,  cur_w)
+        max_loss_streak = max(max_loss_streak, cur_l)
+
+    return {
+        "total_trades":        len(history),
+        "total_wins":          sum(1 for e in finished if e["result"]=="WIN"),
+        "total_losses":        sum(1 for e in finished if e["result"]=="LOSS"),
+        "total_pending":       sum(1 for e in history if e.get("result")=="PENDING"),
+        "win_rate_overall":    wr(finished),
+        "win_rate_manual":     wr([e for e in finished if e.get("mode")=="manual"]),
+        "win_rate_ai_scanner": wr([e for e in finished if e.get("mode")=="ai_scanner"]),
+        "best_symbol":         best_sym,
+        "worst_symbol":        worst_sym,
+        "current_streak":      cur_streak,
+        "current_streak_type": cur_type,
+        "longest_win_streak":  max_win_streak,
+        "longest_loss_streak": max_loss_streak,
+    }
+
+
+# ── Sessions ──────────────────────────────────────────────────────────────────
+import uuid as _uuid
+
+SESSIONS_FILE = "sessions.json"
+
+class SessionStartRequest(BaseModel):
+    deposit: float
+    risk_pct: float = 5.0
+    max_martingale: int = 3
+
+class SessionEndRequest(BaseModel):
+    session_id: str
+
+def load_sessions() -> list:
+    if not os.path.exists(SESSIONS_FILE): return []
+    with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+        try: return json.load(f)
+        except: return []
+
+def save_sessions(sessions: list):
+    with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
+        json.dump(sessions, f, ensure_ascii=False, indent=2)
+
+@app.post("/session/start")
+def start_session(payload: SessionStartRequest):
+    sessions = load_sessions()
+    # End any currently active session
+    for s in sessions:
+        if s.get("ended_at") is None:
+            s["ended_at"] = datetime.now(timezone.utc).isoformat()
+            s["end_reason"] = "auto_closed"
+    session_id = str(_uuid.uuid4())
+    sessions.append({
+        "id":            session_id,
+        "started_at":    datetime.now(timezone.utc).isoformat(),
+        "ended_at":      None,
+        "deposit":       payload.deposit,
+        "risk_pct":      payload.risk_pct,
+        "max_martingale": payload.max_martingale,
+        "trade_ids":     [],
+        "wins":          0,
+        "losses":        0,
+        "pnl":           0.0,
+        "end_reason":    None,
+    })
+    save_sessions(sessions)
+    return {"session_id": session_id, "started_at": sessions[-1]["started_at"]}
+
+@app.post("/session/end")
+def end_session(payload: SessionEndRequest):
+    sessions = load_sessions()
+    for s in sessions:
+        if s["id"] == payload.session_id and s.get("ended_at") is None:
+            s["ended_at"]  = datetime.now(timezone.utc).isoformat()
+            s["end_reason"] = "manual"
+            save_sessions(sessions)
+            return s
+    return {"error": "session not found or already ended"}
+
+@app.get("/session/current")
+def get_current_session():
+    sessions = load_sessions()
+    for s in reversed(sessions):
+        if s.get("ended_at") is None:
+            # Attach trade details
+            history = load_history()
+            trades  = [e for e in history if e.get("trade_id") in s.get("trade_ids", [])]
+            s["trades_detail"] = trades
+            return s
+    return {"active": False}
+
+@app.get("/session/history")
+def get_session_history():
+    sessions = load_sessions()
+    return {"sessions": list(reversed(sessions[-20:]))}
+
+@app.get("/session/{session_id}")
+def get_session(session_id: str):
+    sessions = load_sessions()
+    for s in sessions:
+        if s["id"] == session_id:
+            history = load_history()
+            trades  = [e for e in history if e.get("trade_id") in s.get("trade_ids", [])]
+            s["trades_detail"] = trades
+            return s
+    return {"error": "not found"}
+
+@app.post("/session/add_trade")
+def add_trade_to_session(payload: dict):
+    """Called when user confirms a trade — links it to active session."""
+    trade_id   = payload.get("trade_id")
+    result     = payload.get("result")       # "WIN" | "LOSS" | None
+    trade_size = payload.get("trade_size", 0)
+    pnl_delta  = payload.get("pnl_delta", 0)
+    sessions = load_sessions()
+    for s in reversed(sessions):
+        if s.get("ended_at") is None:
+            if trade_id and trade_id not in s.get("trade_ids", []):
+                s.setdefault("trade_ids", []).append(trade_id)
+            if result == "WIN":
+                s["wins"]  = s.get("wins", 0)  + 1
+                s["pnl"]   = s.get("pnl",  0)  + abs(pnl_delta)
+            elif result == "LOSS":
+                s["losses"] = s.get("losses", 0) + 1
+                s["pnl"]    = s.get("pnl",  0)  - abs(pnl_delta)
+            # Auto-stop: 3 losses in a row or >20% drawdown
+            recent = s.get("trade_ids", [])
+            history = load_history()
+            recent_results = [e.get("result") for e in history
+                              if e.get("trade_id") in recent[-3:]]
+            if recent_results.count("LOSS") >= 3:
+                s["ended_at"]  = datetime.now(timezone.utc).isoformat()
+                s["end_reason"] = "martingale_limit"
+            save_sessions(sessions)
+            return {"ok": True, "session": s}
+    return {"ok": False, "reason": "no active session"}
 
 
 # ── News Calendar ─────────────────────────────────────────────────────────────
