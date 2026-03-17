@@ -432,6 +432,8 @@ def root():
 @app.get("/history")
 def get_history():
     history = load_history()
+    # Only show entries created by the new flow (have trade_id)
+    history = [e for e in history if e.get("trade_id")]
     finished  = [e for e in history if e.get("result") in ("WIN", "LOSS")]
     manual_f  = [e for e in finished if e.get("mode") == "manual"]
     ai_f      = [e for e in finished if e.get("mode") == "ai_scanner"]
