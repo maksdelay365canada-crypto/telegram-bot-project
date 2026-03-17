@@ -4,6 +4,7 @@ import os
 import threading
 import time
 import logging
+import requests as _req
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,46 @@ OTC_ASSET_CONFIG = {
 }
 
 ALL_ASSETS = {**ASSET_CONFIG, **OTC_ASSET_CONFIG}
+
+ASSET_CURRENCIES: dict = {
+    # Форекс
+    "EUR/USD": ["EUR","USD"], "GBP/USD": ["GBP","USD"],
+    "AUD/USD": ["AUD","USD"], "USD/JPY": ["USD","JPY"],
+    "USD/CAD": ["USD","CAD"], "USD/CHF": ["USD","CHF"],
+    "EUR/GBP": ["EUR","GBP"], "EUR/JPY": ["EUR","JPY"],
+    "EUR/CHF": ["EUR","CHF"], "EUR/AUD": ["EUR","AUD"],
+    "EUR/CAD": ["EUR","CAD"], "GBP/JPY": ["GBP","JPY"],
+    "GBP/CHF": ["GBP","CHF"], "GBP/AUD": ["GBP","AUD"],
+    "GBP/CAD": ["GBP","CAD"], "AUD/JPY": ["AUD","JPY"],
+    "AUD/CAD": ["AUD","CAD"], "AUD/CHF": ["AUD","CHF"],
+    "CAD/JPY": ["CAD","JPY"], "CAD/CHF": ["CAD","CHF"],
+    "CHF/JPY": ["CHF","JPY"], "NZD/USD": ["NZD","USD"],
+    "NZD/JPY": ["NZD","JPY"], "NZD/CAD": ["NZD","CAD"],
+    "NZD/CHF": ["NZD","CHF"], "NZD/GBP": ["NZD","GBP"],
+    # OTC Форекс (те же валюты)
+    "EUR/USD OTC": ["EUR","USD"], "GBP/USD OTC": ["GBP","USD"],
+    "AUD/USD OTC": ["AUD","USD"], "USD/JPY OTC": ["USD","JPY"],
+    "USD/CAD OTC": ["USD","CAD"], "USD/CHF OTC": ["USD","CHF"],
+    "EUR/GBP OTC": ["EUR","GBP"], "EUR/JPY OTC": ["EUR","JPY"],
+    "GBP/JPY OTC": ["GBP","JPY"],
+    # Крипто (не отслеживаем новости FF)
+    "Bitcoin": [], "Ethereum": [], "Dash": [], "Chainlink": [], "Bitcoin Cash": [],
+    # Акции → USD
+    "Apple": ["USD"], "Microsoft": ["USD"], "Tesla": ["USD"],
+    "Netflix": ["USD"], "Amazon": ["USD"], "Google": ["USD"],
+    "Meta": ["USD"], "Intel": ["USD"], "Cisco": ["USD"],
+    "ExxonMobil": ["USD"], "Johnson & Johnson": ["USD"], "Pfizer": ["USD"],
+    "Boeing": ["USD"], "McDonald's": ["USD"], "JPMorgan": ["USD"],
+    "American Express": ["USD"], "Citigroup": ["USD"], "Alibaba": ["USD"],
+    # Индексы
+    "US100": ["USD"], "SP500": ["USD"], "DJI30": ["USD"],
+    "DAX": ["EUR"], "FTSE 100": ["GBP"], "CAC 40": ["EUR"],
+    "Nikkei 225": ["JPY"], "AUS 200": ["AUD"],
+    "Euro Stoxx 50": ["EUR"], "Hang Seng": [],
+    # Товары → USD
+    "Gold": ["USD"], "Silver": ["USD"], "Oil Brent": ["USD"],
+    "Oil WTI": ["USD"], "Natural Gas": ["USD"], "Platinum": ["USD"],
+}
 
 HISTORY_FILE     = "signals_history.json"
 CACHE_TTL        = 30
@@ -722,3 +763,161 @@ def scan_all_timeframes(payload: SignalRequest):
 @app.get("/price")
 def get_price(symbol: str):
     return {"symbol": symbol, "price": get_current_price(symbol)}
+
+
+# ── News Calendar ─────────────────────────────────────────────────────────────
+
+_news_cache: dict = {"data": None, "ts": 0.0}
+_NEWS_TTL = 300  # 5 minutes
+
+
+def _fetch_news_raw() -> list:
+    now = time.time()
+    if _news_cache["data"] is not None and now - _news_cache["ts"] < _NEWS_TTL:
+        return _news_cache["data"]
+    try:
+        resp = _req.get(
+            "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        data = resp.json()
+        _news_cache["data"] = data
+        _news_cache["ts"] = now
+        return data
+    except Exception as e:
+        logger.warning(f"News fetch error: {e}")
+        return _news_cache["data"] or []
+
+
+def _parse_ff_time(date_str: str, time_str: str) -> datetime | None:
+    if not time_str or time_str.lower() in ("tentative", "all day", ""):
+        return None
+    try:
+        date_part = None
+        for fmt in ("%Y-%m-%d", "%b %d, %Y"):
+            try:
+                date_part = datetime.strptime(date_str.strip(), fmt)
+                break
+            except ValueError:
+                continue
+        if date_part is None:
+            return None
+
+        time_str_c = time_str.strip().lower()
+        time_part = None
+        for tfmt in ("%I:%M%p", "%H:%M", "%I%p"):
+            try:
+                time_part = datetime.strptime(time_str_c, tfmt)
+                break
+            except ValueError:
+                continue
+        if time_part is None:
+            return None
+
+        dt = date_part.replace(
+            hour=time_part.hour, minute=time_part.minute, second=0,
+            tzinfo=timezone(timedelta(hours=-5)),  # Eastern Time
+        )
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _build_news_event(ev: dict, now: datetime) -> dict:
+    ev_time = _parse_ff_time(ev.get("date", ""), ev.get("time", ""))
+    impact = ev.get("impact", "Low").lower()
+    if impact not in ("high", "medium", "low"):
+        impact = "low"
+    minutes_until = None
+    if ev_time:
+        minutes_until = int((ev_time - now).total_seconds() / 60)
+    return {
+        "time_utc":      ev_time.isoformat() if ev_time else None,
+        "currency":      ev.get("country", ""),
+        "title":         ev.get("title", ""),
+        "impact":        impact,
+        "forecast":      ev.get("forecast") or "",
+        "previous":      ev.get("previous") or "",
+        "actual":        ev.get("actual") or None,
+        "minutes_until": minutes_until,
+    }
+
+
+@app.get("/news")
+def get_news(currency: str | None = None):
+    raw = _fetch_news_raw()
+    now = datetime.now(timezone.utc)
+    events = [_build_news_event(ev, now) for ev in raw]
+
+    if currency:
+        currencies = {c.strip().upper() for c in currency.split(",")}
+        events = [e for e in events if e["currency"].upper() in currencies]
+
+    events.sort(key=lambda e: e["minutes_until"] if e["minutes_until"] is not None else 999999)
+
+    upcoming_imp = [
+        e for e in events
+        if e["impact"] in ("high", "medium")
+        and e["minutes_until"] is not None
+        and 0 <= e["minutes_until"] <= 30
+    ]
+    warning = bool(upcoming_imp)
+    warning_message = None
+    if upcoming_imp:
+        e = upcoming_imp[0]
+        warning_message = (
+            f"Важная новость через {e['minutes_until']} мин: "
+            f"{e['currency']} — {e['title']}"
+        )
+
+    return {"events": events, "warning": warning, "warning_message": warning_message}
+
+
+@app.get("/news/check")
+def check_news_for_symbol(symbol: str):
+    currencies = ASSET_CURRENCIES.get(symbol, [])
+    if not currencies:
+        return {"warning": False, "warning_message": None, "events": []}
+
+    raw = _fetch_news_raw()
+    now = datetime.now(timezone.utc)
+
+    relevant = []
+    for ev in raw:
+        if ev.get("country", "").upper() not in [c.upper() for c in currencies]:
+            continue
+        impact = ev.get("impact", "Low").lower()
+        if impact not in ("high", "medium"):
+            continue
+        ev_time = _parse_ff_time(ev.get("date", ""), ev.get("time", ""))
+        if not ev_time:
+            continue
+        minutes_until = int((ev_time - now).total_seconds() / 60)
+        if -5 <= minutes_until <= 30:
+            relevant.append({
+                "currency":      ev.get("country", ""),
+                "title":         ev.get("title", ""),
+                "impact":        impact,
+                "minutes_until": minutes_until,
+            })
+
+    warning = bool(relevant)
+    warning_message = None
+    if relevant:
+        e = relevant[0]
+        m = e["minutes_until"]
+        icon = "🔴" if e["impact"] == "high" else "🟡"
+        if m >= 0:
+            warning_message = (
+                f"Через {m} мин выходит важная новость:\n"
+                f"{icon} {e['currency']} — {e['title']}"
+            )
+        else:
+            warning_message = (
+                f"Только что вышла новость:\n"
+                f"{icon} {e['currency']} — {e['title']}\n"
+                f"Возможна повышенная волатильность"
+            )
+
+    return {"warning": warning, "warning_message": warning_message, "events": relevant}

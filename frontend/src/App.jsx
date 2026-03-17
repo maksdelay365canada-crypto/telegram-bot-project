@@ -88,6 +88,24 @@ function genTradeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+function getAssetCurrencies(sym) {
+  const clean = sym.replace(" OTC", "");
+  const parts = clean.split("/");
+  if (parts.length === 2 && parts[0].length >= 3 && parts[1].length >= 3) {
+    return [parts[0], parts[1]];
+  }
+  const usdList = ["Gold","Silver","Oil Brent","Oil WTI","Natural Gas","Platinum",
+    "US100","SP500","DJI30","Apple","Microsoft","Tesla","Netflix","Amazon","Google",
+    "Meta","Intel","Cisco","ExxonMobil","Johnson & Johnson","Pfizer","Boeing",
+    "McDonald's","JPMorgan","American Express","Citigroup","Alibaba"];
+  if (usdList.includes(sym)) return ["USD"];
+  if (["DAX","CAC 40","Euro Stoxx 50"].includes(sym)) return ["EUR"];
+  if (sym === "FTSE 100") return ["GBP"];
+  if (sym === "Nikkei 225") return ["JPY"];
+  if (sym === "AUS 200") return ["AUD"];
+  return [];
+}
+
 // ─── TradingView chart ────────────────────────────────────────────────────────
 function TradingViewWidget({ symbol, interval }) {
   const id = "tv-widget-container";
@@ -222,6 +240,43 @@ function TradeCard({ trade }) {
   );
 }
 
+// ─── News event card ──────────────────────────────────────────────────────────
+function NewsEventCard({ event }) {
+  const impactIcon  = event.impact === "high" ? "🔴" : event.impact === "medium" ? "🟡" : "⚪";
+  const impactColor = event.impact === "high" ? C.red  : event.impact === "medium" ? "#f59e0b" : C.muted;
+  const timeStr = event.time_utc
+    ? new Date(event.time_utc).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+    : "";
+  const m = event.minutes_until;
+  const timeLabel = m === null ? "" : m < 0 ? "прошло" : m === 0 ? "СЕЙЧАС!" : `через ${m}м`;
+  const urgentColor = m !== null && m >= 0 && m <= 30 ? impactColor : C.muted;
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${event.impact !== "low" ? impactColor + "30" : C.border}`, borderRadius: "12px", padding: "12px 14px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "7px", alignItems: "center" }}>
+          <span>{impactIcon}</span>
+          <span style={{ background: impactColor + "25", color: impactColor, border: `1px solid ${impactColor}40`, padding: "1px 7px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
+            {event.currency}
+          </span>
+          <span style={{ color: C.muted, fontSize: "12px" }}>{timeStr}</span>
+        </div>
+        {timeLabel && <span style={{ color: urgentColor, fontSize: "11px", fontWeight: 700 }}>{timeLabel}</span>}
+      </div>
+      <div style={{ color: C.text, fontSize: "13px", fontWeight: 600, marginTop: "6px", paddingLeft: "24px" }}>
+        {event.title}
+      </div>
+      {(event.forecast || event.previous || event.actual) && (
+        <div style={{ display: "flex", gap: "14px", marginTop: "5px", paddingLeft: "24px", flexWrap: "wrap" }}>
+          {event.forecast && <span style={{ color: C.muted, fontSize: "11px" }}>Прогноз: <strong style={{ color: C.text }}>{event.forecast}</strong></span>}
+          {event.previous && <span style={{ color: C.muted, fontSize: "11px" }}>Пред: <strong style={{ color: C.text }}>{event.previous}</strong></span>}
+          {event.actual   && <span style={{ color: C.muted, fontSize: "11px" }}>Факт: <strong style={{ color: C.green }}>{event.actual}</strong></span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main app ─────────────────────────────────────────────────────────────────
 export default function App() {
   // Asset selection
@@ -251,6 +306,14 @@ export default function App() {
   // History tab
   const [historyData, setHistoryData] = useState(null);
 
+  // News tab
+  const [newsData,           setNewsData]           = useState(null);
+  const [newsLoading,        setNewsLoading]         = useState(false);
+  const [newsCurrencyFilter, setNewsCurrencyFilter]  = useState("ALL");
+  const [newsImpactFilter,   setNewsImpactFilter]    = useState("all");
+  const [newsIndicator,      setNewsIndicator]       = useState(null);
+  const [newsWarning,        setNewsWarning]         = useState(null);
+
   // Reset symbol when category changes
   useEffect(() => {
     const list = CATEGORIES[category];
@@ -261,6 +324,30 @@ export default function App() {
   useEffect(() => {
     if (activeTab === "history") fetchHistory();
   }, [activeTab]);
+
+  // News indicator — refresh when symbol changes
+  useEffect(() => {
+    let cancelled = false;
+    async function checkIndicator() {
+      try {
+        const res = await fetch(`${API}/news/check?symbol=${encodeURIComponent(symbol)}`);
+        const d   = await res.json();
+        if (cancelled) return;
+        if (!d.warning) { setNewsIndicator("green"); return; }
+        setNewsIndicator(d.events.some(e => e.impact === "high") ? "red" : "yellow");
+      } catch (_) { if (!cancelled) setNewsIndicator(null); }
+    }
+    checkIndicator();
+    return () => { cancelled = true; };
+  }, [symbol]);
+
+  // News tab — load + auto-refresh every 5 min while tab is open
+  useEffect(() => {
+    if (activeTab !== "news") return;
+    fetchNewsTab();
+    const id = setInterval(fetchNewsTab, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [activeTab, newsCurrencyFilter]);
 
   // Poll live price while trade is confirmed (before timer fires)
   useEffect(() => {
@@ -304,6 +391,17 @@ export default function App() {
     } catch (_) {}
   }
 
+  async function fetchNewsTab() {
+    setNewsLoading(true);
+    try {
+      const url = newsCurrencyFilter === "ALL"
+        ? `${API}/news`
+        : `${API}/news?currency=${newsCurrencyFilter}`;
+      const res = await fetch(url);
+      setNewsData(await res.json());
+    } catch (_) {} finally { setNewsLoading(false); }
+  }
+
   async function postHistoryAdd(id, sig, expiry, scannerMode, step) {
     const sym = sig.symbol || symbol;
     const otc = OTC_ASSETS.has(sym);
@@ -342,8 +440,25 @@ export default function App() {
 
   // ── flow actions ─────────────────────────────────────────────────────────
 
-  async function fetchSignal(scannerMode = false) {
+  async function fetchSignal(scannerMode = false, skipNewsCheck = false) {
     if (loading) return;
+
+    // Check for upcoming high/medium impact news before fetching
+    if (!skipNewsCheck) {
+      try {
+        const res = await fetch(`${API}/news/check?symbol=${encodeURIComponent(symbol)}`);
+        const d   = await res.json();
+        if (d.warning) {
+          setNewsWarning({
+            message:   d.warning_message,
+            events:    d.events,
+            onProceed: () => { setNewsWarning(null); fetchSignal(scannerMode, true); },
+          });
+          return;
+        }
+      } catch (_) {} // silently skip news check on network error
+    }
+
     setLoading(true);
     setIsScanner(scannerMode);
     try {
@@ -535,14 +650,19 @@ export default function App() {
               )}
             </div>
           </div>
-          <div style={{ background: "rgba(59,130,246,0.12)", color: "#7fb0ff", padding: "7px 14px", borderRadius: "999px", fontWeight: 700, fontSize: "12px", border: "1px solid rgba(59,130,246,0.25)" }}>
-            {loading ? "Анализ..." : inFlow ? "В сделке" : "Готов"}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {newsIndicator === "red"    && <span title="Важная новость в ближайший час!" style={{ fontSize: "16px", cursor: "pointer" }} onClick={() => setActiveTab("news")}>🔴</span>}
+            {newsIndicator === "yellow" && <span title="Новость средней важности" style={{ fontSize: "16px", cursor: "pointer" }} onClick={() => setActiveTab("news")}>🟡</span>}
+            {newsIndicator === "green"  && <span title="Новостей нет — хорошее время" style={{ fontSize: "16px", cursor: "pointer" }} onClick={() => setActiveTab("news")}>✅</span>}
+            <div style={{ background: "rgba(59,130,246,0.12)", color: "#7fb0ff", padding: "7px 14px", borderRadius: "999px", fontWeight: 700, fontSize: "12px", border: "1px solid rgba(59,130,246,0.25)" }}>
+              {loading ? "Анализ..." : inFlow ? "В сделке" : "Готов"}
+            </div>
           </div>
         </div>
 
         {/* ── Tabs ── */}
         <div style={{ display: "flex", gap: "6px" }}>
-          {[["signal", "Сигнал"], ["scanner", "AI Сканер"], ["history", "История"]].map(([tab, label]) => (
+          {[["signal", "Сигнал"], ["scanner", "AI Сканер"], ["history", "История"], ["news", "📰 Новости"]].map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               flex: 1, padding: "10px 4px", borderRadius: "12px", border: "none",
               background: activeTab === tab ? C.primary : C.card,
@@ -645,8 +765,38 @@ export default function App() {
               </div>
             )}
 
+            {/* ── IDLE: news warning ── */}
+            {!sessionStopped && !winFlash && flowStep === "idle" && newsWarning && (
+              <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: "16px", padding: "20px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "14px" }}>
+                  <span style={{ fontSize: "22px" }}>⚠️</span>
+                  <div>
+                    <div style={{ color: "#f59e0b", fontWeight: 800, fontSize: "14px", marginBottom: "4px" }}>ВНИМАНИЕ! Важная новость</div>
+                    {newsWarning.message.split("\n").map((line, i) => (
+                      <div key={i} style={{ color: "#e2c97e", fontSize: "13px", lineHeight: "1.5" }}>{line}</div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ color: C.muted, fontSize: "12px", marginBottom: "14px" }}>
+                  Рекомендуем подождать после выхода новости — рынок может быть волатильным.
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={newsWarning.onProceed} style={{
+                    flex: 1, padding: "12px", borderRadius: "10px",
+                    border: "1px solid rgba(245,158,11,0.4)", background: "rgba(245,158,11,0.12)",
+                    color: "#f59e0b", fontWeight: 700, fontSize: "13px", cursor: "pointer",
+                  }}>Всё равно получить сигнал</button>
+                  <button onClick={() => setNewsWarning(null)} style={{
+                    flex: 1, padding: "12px", borderRadius: "10px",
+                    border: `1px solid ${C.border}`, background: C.card,
+                    color: C.muted, fontWeight: 700, fontSize: "13px", cursor: "pointer",
+                  }}>Подождать</button>
+                </div>
+              </div>
+            )}
+
             {/* ── IDLE: get signal button ── */}
-            {!sessionStopped && !winFlash && flowStep === "idle" && (
+            {!sessionStopped && !winFlash && flowStep === "idle" && !newsWarning && (
               <button onClick={() => fetchSignal(false)} disabled={loading} style={{
                 width: "100%", border: "none",
                 background: loading ? "rgba(59,130,246,0.4)" : "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
@@ -963,6 +1113,73 @@ export default function App() {
               color: C.muted, fontWeight: 600, fontSize: "13px", cursor: "pointer",
             }}>
               Обновить
+            </button>
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            NEWS TAB
+        ════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "news" && (
+          <>
+            {/* Currency filter */}
+            <div style={{ background: C.card, borderRadius: "16px", padding: "12px 14px", border: `1px solid ${C.border}` }}>
+              <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "8px" }}>Валюта</div>
+              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                {["ALL","USD","EUR","GBP","JPY","AUD","CAD","CHF","NZD"].map(c => (
+                  <button key={c} onClick={() => setNewsCurrencyFilter(c)} style={{
+                    padding: "5px 10px", borderRadius: "8px", fontWeight: 700, fontSize: "12px", cursor: "pointer",
+                    border: newsCurrencyFilter === c ? "1px solid rgba(59,130,246,0.5)" : `1px solid ${C.border}`,
+                    background: newsCurrencyFilter === c ? "rgba(59,130,246,0.18)" : C.input,
+                    color: newsCurrencyFilter === c ? "#7fb0ff" : C.muted,
+                  }}>{c}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Impact filter */}
+            <div style={{ background: C.card, borderRadius: "16px", padding: "6px", border: `1px solid ${C.border}`, display: "flex", gap: "4px" }}>
+              {[["all","Все события"], ["important","Только важные"]].map(([v, l]) => (
+                <button key={v} onClick={() => setNewsImpactFilter(v)} style={{
+                  flex: 1, padding: "9px 8px", borderRadius: "10px", border: "none",
+                  background: newsImpactFilter === v ? "rgba(59,130,246,0.18)" : "transparent",
+                  color: newsImpactFilter === v ? "#7fb0ff" : C.muted,
+                  fontWeight: 700, fontSize: "13px", cursor: "pointer",
+                }}>{l}</button>
+              ))}
+            </div>
+
+            {/* Event list */}
+            {newsLoading ? (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "32px", textAlign: "center", color: C.muted, fontSize: "14px" }}>
+                Загрузка новостей...
+              </div>
+            ) : newsData?.events?.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {(() => {
+                  const filtered = newsData.events.filter(e => newsImpactFilter === "all" || e.impact !== "low");
+                  if (filtered.length === 0) return (
+                    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "32px", textAlign: "center", color: C.muted, fontSize: "14px" }}>
+                      Важных новостей нет
+                    </div>
+                  );
+                  return filtered.map((ev, i) => <NewsEventCard key={i} event={ev} />);
+                })()}
+              </div>
+            ) : (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: "32px", marginBottom: "8px" }}>📅</div>
+                <div style={{ color: C.muted, fontSize: "14px" }}>Нет данных. Нажмите обновить.</div>
+              </div>
+            )}
+
+            <button onClick={fetchNewsTab} disabled={newsLoading} style={{
+              width: "100%", padding: "12px", borderRadius: "12px",
+              border: `1px solid ${C.border}`, background: C.card,
+              color: C.muted, fontWeight: 600, fontSize: "13px", cursor: "pointer",
+              opacity: newsLoading ? 0.5 : 1,
+            }}>
+              {newsLoading ? "Обновляется..." : "Обновить"}
             </button>
           </>
         )}
