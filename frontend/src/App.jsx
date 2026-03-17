@@ -341,9 +341,9 @@ export default function App() {
   }
 
   async function handleConfirmEntry() {
-    const id      = genTradeId();
-    const expiry  = signalData?.expiry_time
-      || new Date(Date.now() + (TF_MINS[signalData?.timeframe || timeframe] || 1) * 60000).toISOString();
+    const id     = genTradeId();
+    const mins   = TF_MINS[signalData?.timeframe || timeframe] || 1;
+    const expiry = new Date(Date.now() + mins * 60000).toISOString();
     setTradeId(id);
     await postHistoryAdd(id, signalData, expiry, isScanner, dogonStep);
     setSignalData(prev => ({ ...prev, expiry_time: expiry }));
