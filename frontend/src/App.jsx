@@ -1,5 +1,5 @@
 import "./App.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
@@ -55,53 +55,60 @@ const C = {
   primary: "#3b82f6",
   green: "#10b981",
   red: "#ef4444",
+  orange: "#f97316",
+  purple: "#a78bfa",
   text: "#f1f5f9",
   muted: "#64748b",
   border: "rgba(255,255,255,0.07)",
 };
 
-function TradingViewWidget({ symbol, interval }) {
-  const containerId = "tv-widget-container";
-  useEffect(() => {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = "";
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: symbol,
-      interval: interval === "M1" ? "1" : interval === "M3" ? "3" : interval === "M5" ? "5" : "15",
-      timezone: "Etc/UTC",
-      theme: "dark",
-      style: "1",
-      locale: "ru",
-      enable_publishing: false,
-      hide_top_toolbar: false,
-      hide_legend: true,
-      save_image: false,
-      container_id: containerId,
-    });
-    container.appendChild(script);
-  }, [symbol, interval]);
+const TF_MINS = { M1: 1, M3: 3, M5: 5, M15: 15 };
 
+function genTradeId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// ─── TradingView chart ────────────────────────────────────────────────────────
+function TradingViewWidget({ symbol, interval }) {
+  const id = "tv-widget-container";
+  useEffect(() => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = "";
+    const s = document.createElement("script");
+    s.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+    s.async = true;
+    s.innerHTML = JSON.stringify({
+      autosize: true, symbol, timezone: "Etc/UTC", theme: "dark", style: "1",
+      locale: "ru", enable_publishing: false, hide_top_toolbar: false,
+      hide_legend: true, save_image: false, container_id: id,
+      interval: interval === "M1" ? "1" : interval === "M3" ? "3" : interval === "M5" ? "5" : "15",
+    });
+    el.appendChild(s);
+  }, [symbol, interval]);
   return (
     <div style={{ height: "300px", width: "100%", borderRadius: "16px", overflow: "hidden", background: C.card }}>
-      <div id={containerId} style={{ height: "100%", width: "100%" }} />
+      <div id={id} style={{ height: "100%", width: "100%" }} />
     </div>
   );
 }
 
-function CountdownBar({ expiryTime, timeframeMins }) {
-  const totalSecs = timeframeMins * 60;
+// ─── Countdown bar ────────────────────────────────────────────────────────────
+function CountdownBar({ expiryTime, totalMins, onExpire }) {
+  const totalSecs = totalMins * 60;
   const [remaining, setRemaining] = useState(totalSecs);
+  const firedRef = useRef(false);
 
   useEffect(() => {
     if (!expiryTime) return;
+    firedRef.current = false;
     const tick = () => {
       const diff = Math.max(0, Math.round((new Date(expiryTime) - Date.now()) / 1000));
       setRemaining(diff);
+      if (diff === 0 && !firedRef.current) {
+        firedRef.current = true;
+        onExpire?.();
+      }
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -109,24 +116,25 @@ function CountdownBar({ expiryTime, timeframeMins }) {
   }, [expiryTime]);
 
   const pct = totalSecs > 0 ? (remaining / totalSecs) * 100 : 0;
-  const h = String(Math.floor(remaining / 3600)).padStart(2, "0");
-  const m = String(Math.floor((remaining % 3600) / 60)).padStart(2, "0");
+  const m = String(Math.floor(remaining / 60)).padStart(2, "0");
   const s = String(remaining % 60).padStart(2, "0");
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-        <span style={{ color: C.muted, fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.6px" }}>До истечения</span>
+        <span style={{ color: C.muted, fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.6px" }}>
+          ⏱ До истечения
+        </span>
         <span style={{ color: remaining < 30 ? C.red : C.text, fontSize: "14px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-          {h}:{m}:{s}
+          {m}:{s}
         </span>
       </div>
       <div style={{ width: "100%", height: "6px", borderRadius: "999px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
         <div style={{
-          height: "100%",
-          width: pct + "%",
-          borderRadius: "999px",
-          background: pct > 40 ? `linear-gradient(90deg, ${C.primary}, ${C.green})` : `linear-gradient(90deg, ${C.red}, #f97316)`,
+          height: "100%", width: pct + "%", borderRadius: "999px",
+          background: pct > 40
+            ? `linear-gradient(90deg, ${C.primary}, ${C.green})`
+            : `linear-gradient(90deg, ${C.red}, ${C.orange})`,
           transition: "width 1s linear",
         }} />
       </div>
@@ -134,114 +142,248 @@ function CountdownBar({ expiryTime, timeframeMins }) {
   );
 }
 
+// ─── Trade history card ───────────────────────────────────────────────────────
+function TradeCard({ trade }) {
+  if (!trade.signal || trade.signal === "NO SIGNAL") return null;
+  const result = trade.result || "PENDING";
+  const resultColor = result === "WIN" ? C.green : result === "LOSS" ? C.red : C.muted;
+  const resultText  = result === "WIN" ? "✅ Выиграл" : result === "LOSS" ? "❌ Проиграл" : "⏳ Ожидает";
+  const modeColor   = trade.mode === "ai_scanner" ? C.purple : C.primary;
+  const modeLabel   = trade.mode === "ai_scanner" ? "AI СКАНЕР" : "РУЧНОЙ";
+  const sigColor    = trade.signal === "UP" ? C.green : C.red;
+  const ts = trade.timestamp
+    ? new Date(trade.timestamp.endsWith("Z") ? trade.timestamp : trade.timestamp + "Z")
+        .toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "14px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+        <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+          <span style={{ background: modeColor + "20", color: modeColor, padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}>
+            {modeLabel}
+          </span>
+          {trade.is_martingale && (
+            <span style={{ background: "rgba(249,115,22,0.15)", color: C.orange, padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}>
+              ДОГОН {trade.martingale_step}/3
+            </span>
+          )}
+        </div>
+        <span style={{ color: resultColor, fontSize: "13px", fontWeight: 700 }}>{resultText}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: "14px" }}>{trade.symbol}</span>
+          <span style={{ color: C.muted, fontSize: "12px", marginLeft: "6px" }}>{trade.timeframe}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ color: sigColor, fontWeight: 800, fontSize: "14px" }}>
+            {trade.signal === "UP" ? "ВВЕРХ ⬆" : "ВНИЗ ⬇"}
+          </span>
+          <span style={{ color: sigColor, fontSize: "13px" }}>{trade.confidence}%</span>
+        </div>
+      </div>
+      {(trade.entry_price || ts) && (
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
+          {trade.entry_price ? (
+            <span style={{ color: C.muted, fontSize: "11px" }}>
+              Вход: {Number(trade.entry_price).toLocaleString("ru-RU", { maximumFractionDigits: 5 })}
+            </span>
+          ) : <span />}
+          {ts && <span style={{ color: C.muted, fontSize: "11px" }}>{ts}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main app ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [category, setCategory] = useState("Форекс");
-  const [symbol, setSymbol] = useState("EUR/USD");
+  // Asset selection
+  const [category, setCategory]   = useState("Форекс");
+  const [symbol,   setSymbol]     = useState("EUR/USD");
   const [timeframe, setTimeframe] = useState("M1");
-  const [mode, setMode] = useState("Уверенный");
-  const [signalData, setSignalData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [dogonStep, setDogonStep] = useState(0);
-  const [sessionStopped, setSessionStopped] = useState(false);
-  const [resultShown, setResultShown] = useState(false);
-  const [winFlash, setWinFlash] = useState(false);
+  const [mode,     setMode]       = useState("Уверенный");
+
+  // Navigation
   const [activeTab, setActiveTab] = useState("signal");
-  const [scanData, setScanData] = useState(null);
+
+  // Trade flow: idle → signal → confirmed → result_shown
+  const [flowStep,    setFlowStep]    = useState("idle");
+  const [signalData,  setSignalData]  = useState(null);
+  const [tradeId,     setTradeId]     = useState(null);
+  const [isScanner,   setIsScanner]   = useState(false);
+  const [dogonStep,   setDogonStep]   = useState(0);
+  const [sessionStopped, setSessionStopped] = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [currentPrice, setCurrentPrice] = useState(null);
+  const [winFlash,    setWinFlash]    = useState(false);
+
+  // Scanner tab
+  const [scanData,    setScanData]    = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
 
-  const timeframeMins = { M1: 1, M3: 3, M5: 5, M15: 15 };
+  // History tab
+  const [historyData, setHistoryData] = useState(null);
 
-  // When category changes, reset symbol to first in new category
+  // Reset symbol when category changes
   useEffect(() => {
     const list = CATEGORIES[category];
-    if (list && !list.includes(symbol)) {
-      setSymbol(list[0]);
-    }
+    if (list && !list.includes(symbol)) setSymbol(list[0]);
   }, [category]);
 
-  // When expiry passes, show result buttons
+  // Load history when tab opens
   useEffect(() => {
-    if (!signalData?.expiry_time) return;
-    setResultShown(false);
-    const diff = new Date(signalData.expiry_time) - Date.now();
-    if (diff <= 0) {
-      setResultShown(true);
-      return;
-    }
-    const id = setTimeout(() => setResultShown(true), diff);
-    return () => clearTimeout(id);
-  }, [signalData?.expiry_time]);
+    if (activeTab === "history") fetchHistory();
+  }, [activeTab]);
+
+  // Poll live price while trade is confirmed (before timer fires)
+  useEffect(() => {
+    if (flowStep !== "confirmed") { setCurrentPrice(null); return; }
+    const tradeSym = signalData?.symbol || symbol;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API}/price?symbol=${encodeURIComponent(tradeSym)}`);
+        const d   = await res.json();
+        if (d.price) setCurrentPrice(d.price);
+      } catch (_) {}
+    };
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => clearInterval(id);
+  }, [flowStep, signalData?.symbol, symbol]);
+
+  // ── helpers ──────────────────────────────────────────────────────────────
 
   function playSound(type) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const freqs = type === "win" ? [523, 659, 784] : [400, 300];
+      const freqs = type === "win" ? [523, 659, 784] : [440, 550];
       freqs.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        osc.type = "sine";
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = "sine";
         const t = ctx.currentTime + i * 0.12;
         gain.gain.setValueAtTime(0.25, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-        osc.start(t);
-        osc.stop(t + 0.35);
+        osc.start(t); osc.stop(t + 0.35);
       });
     } catch (_) {}
   }
 
-  async function fetchSignal() {
+  async function fetchHistory() {
+    try {
+      const res = await fetch(`${API}/history`);
+      setHistoryData(await res.json());
+    } catch (_) {}
+  }
+
+  async function postHistoryAdd(id, sig, expiry, scannerMode, step) {
+    try {
+      await fetch(`${API}/history/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trade_id:      id,
+          signal:        sig.signal,
+          confidence:    sig.confidence,
+          symbol:        sig.symbol || symbol,
+          timeframe:     sig.timeframe || timeframe,
+          mode_label:    scannerMode ? "ai_scanner" : "manual",
+          is_martingale: step > 0,
+          martingale_step: step,
+          entry_price:   sig.entry_price,
+          expiry_time:   expiry,
+          reasons:       sig.reasons || [],
+        }),
+      });
+    } catch (_) {}
+  }
+
+  async function postHistoryUpdate(id, result) {
+    try {
+      await fetch(`${API}/history/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trade_id: id, result }),
+      });
+    } catch (_) {}
+  }
+
+  // ── flow actions ─────────────────────────────────────────────────────────
+
+  async function fetchSignal(scannerMode = false) {
     if (loading) return;
     setLoading(true);
-    setResultShown(false);
+    setIsScanner(scannerMode);
     try {
-      const res = await fetch(`${API}/signal`, {
+      const res  = await fetch(`${API}/signal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, timeframe, mode }),
       });
       const data = await res.json();
       setSignalData(data);
-      if (data.signal === "UP" || data.signal === "DOWN") {
-        playSound("signal");
-      }
+      setFlowStep("signal");
+      if (data.signal === "UP" || data.signal === "DOWN") playSound("signal");
     } catch (_) {
       setSignalData({
         signal: "ERROR", confidence: 0,
         reasons: ["Ошибка подключения к серверу"],
-        state: "neutral", symbol, timeframe, mode,
-        timestamp: new Date().toISOString(),
+        entry_price: null, symbol, timeframe,
         expiry_time: new Date(Date.now() + 60000).toISOString(),
-        win_rate: 0,
       });
+      setFlowStep("signal");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleWin() {
+  async function handleConfirmEntry() {
+    const id      = genTradeId();
+    const expiry  = signalData?.expiry_time
+      || new Date(Date.now() + (TF_MINS[signalData?.timeframe || timeframe] || 1) * 60000).toISOString();
+    setTradeId(id);
+    await postHistoryAdd(id, signalData, expiry, isScanner, dogonStep);
+    setSignalData(prev => ({ ...prev, expiry_time: expiry }));
+    setFlowStep("confirmed");
+  }
+
+  function handleSkip() {
+    setSignalData(null);
+    setFlowStep("idle");
+  }
+
+  function handleTimerExpire() {
+    setFlowStep("result_shown");
+  }
+
+  async function handleWin() {
+    if (tradeId) await postHistoryUpdate(tradeId, "WIN");
     playSound("win");
     setWinFlash(true);
     setTimeout(() => setWinFlash(false), 1800);
     setDogonStep(0);
     setSessionStopped(false);
     setSignalData(null);
-    setResultShown(false);
+    setTradeId(null);
+    setFlowStep("idle");
   }
 
-  function handleLoss() {
-    if (dogonStep >= 3) {
-      setSessionStopped(true);
-      return;
-    }
+  async function handleLoss() {
+    if (tradeId) await postHistoryUpdate(tradeId, "LOSS");
     const next = dogonStep + 1;
-    setDogonStep(next);
+    setTradeId(null);
+    setSignalData(null);
     if (next > 3) {
+      setDogonStep(0);
       setSessionStopped(true);
+      setFlowStep("idle");
     } else {
-      fetchSignal(true);
+      setDogonStep(next);
+      setFlowStep("idle");
+      setTimeout(() => fetchSignal(isScanner), 300);
     }
   }
 
@@ -249,20 +391,22 @@ export default function App() {
     setDogonStep(0);
     setSessionStopped(false);
     setSignalData(null);
-    setResultShown(false);
+    setTradeId(null);
+    setFlowStep("idle");
   }
+
+  // ── scanner actions ───────────────────────────────────────────────────────
 
   async function fetchScan() {
     setScanLoading(true);
     setScanData(null);
     try {
-      const res = await fetch(`${API}/scan`, {
+      const res  = await fetch(`${API}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, timeframe: "M1", mode }),
       });
-      const data = await res.json();
-      setScanData(data);
+      setScanData(await res.json());
     } catch (_) {
       setScanData({ results: [], best: null, reason: "Ошибка подключения к серверу" });
     } finally {
@@ -270,407 +414,394 @@ export default function App() {
     }
   }
 
-  const sigColor = (sig) => sig === "UP" ? C.green : sig === "DOWN" ? C.red : C.muted;
-  const tvSymbol = ASSET_TV[symbol] || "FX:EURUSD";
+  async function handleScannerConfirm(best) {
+    const id       = genTradeId();
+    const mins     = TF_MINS[best.timeframe] || 1;
+    const expiry   = new Date(Date.now() + mins * 60000).toISOString();
+    const synthetic = {
+      signal: best.signal, confidence: best.confidence,
+      reasons: best.reasons || [], entry_price: best.entry_price,
+      symbol, timeframe: best.timeframe, expiry_time: expiry,
+    };
+    setSignalData(synthetic);
+    setIsScanner(true);
+    setTradeId(id);
+    await postHistoryAdd(id, synthetic, expiry, true, dogonStep);
+    setFlowStep("confirmed");
+    setActiveTab("signal");
+  }
+
+  // ── derived values ────────────────────────────────────────────────────────
+  const sigColor     = (s) => s === "UP" ? C.green : s === "DOWN" ? C.red : C.muted;
+  const tvSymbol     = ASSET_TV[symbol] || "FX:EURUSD";
   const categoryList = CATEGORIES[category] || [];
-  const isActive = signalData && (signalData.signal === "UP" || signalData.signal === "DOWN");
+  const inFlow       = flowStep !== "idle";
+  const activeIsReal = signalData?.signal === "UP" || signalData?.signal === "DOWN";
+  const activeTFMins = TF_MINS[signalData?.timeframe || timeframe] || 1;
 
+  // ── render helpers ────────────────────────────────────────────────────────
+
+  function DogonBadge({ step }) {
+    if (!step) return null;
+    return (
+      <div style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.3)", borderRadius: "8px", padding: "5px 12px", marginBottom: "12px", color: C.orange, fontWeight: 700, fontSize: "13px", textAlign: "center" }}>
+        ДОГОН {step}/3
+      </div>
+    );
+  }
+
+  function ScannerBadge({ tf }) {
+    return (
+      <div style={{ background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: "8px", padding: "5px 12px", marginBottom: "12px", color: C.purple, fontWeight: 700, fontSize: "12px", textAlign: "center" }}>
+        AI СКАНЕР · {tf}
+      </div>
+    );
+  }
+
+  function ReasonsBox({ reasons }) {
+    if (!reasons?.length) return null;
+    return (
+      <div style={{ background: C.input, borderRadius: "10px", padding: "10px 12px", border: `1px solid ${C.border}`, marginTop: "12px" }}>
+        {reasons.slice(0, 3).map((r, i) => (
+          <div key={i} style={{ color: "#c8d0e0", fontSize: "12px", lineHeight: "1.6" }}>• {r}</div>
+        ))}
+      </div>
+    );
+  }
+
+  function PriceRow({ label, value, color }) {
+    if (value == null) return null;
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+        <span style={{ color: C.muted, fontSize: "13px" }}>{label}</span>
+        <span style={{ color: color || C.text, fontSize: "13px", fontWeight: 700 }}>
+          {Number(value).toLocaleString("ru-RU", { maximumFractionDigits: 5 })}
+        </span>
+      </div>
+    );
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: C.bg,
-      display: "flex",
-      justifyContent: "center",
-      padding: "0",
-    }}>
-      <div style={{
-        width: "100%",
-        maxWidth: "480px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        padding: "16px 14px 60px",
-      }}>
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", gap: "10px", padding: "16px 14px 60px" }}>
 
-        {/* Header */}
-        <div style={{
-          background: "linear-gradient(135deg, #0f1928 0%, #111e35 100%)",
-          border: `1px solid rgba(59,130,246,0.2)`,
-          borderRadius: "20px",
-          padding: "18px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}>
+        {/* ── Header ── */}
+        <div style={{ background: "linear-gradient(135deg, #0f1928 0%, #111e35 100%)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: "20px", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: "22px", fontWeight: 800, color: "#fff", letterSpacing: "-0.5px" }}>
-              {symbol}
-            </div>
+            <div style={{ fontSize: "22px", fontWeight: 800, color: "#fff", letterSpacing: "-0.5px" }}>{symbol}</div>
             <div style={{ color: C.muted, fontSize: "12px", marginTop: "3px" }}>
               {category} · {timeframe}
               {dogonStep > 0 && !sessionStopped && (
-                <span style={{ color: "#f97316", marginLeft: "8px", fontWeight: 700 }}>
-                  ДОГОН {dogonStep}/3
-                </span>
+                <span style={{ color: C.orange, marginLeft: "8px", fontWeight: 700 }}>ДОГОН {dogonStep}/3</span>
               )}
             </div>
           </div>
-          <div style={{
-            background: "rgba(59,130,246,0.12)",
-            color: "#7fb0ff",
-            padding: "7px 14px",
-            borderRadius: "999px",
-            fontWeight: 700,
-            fontSize: "12px",
-            border: "1px solid rgba(59,130,246,0.25)",
-          }}>
-            {loading ? "Анализ..." : isActive ? "Сигнал" : "Готов"}
+          <div style={{ background: "rgba(59,130,246,0.12)", color: "#7fb0ff", padding: "7px 14px", borderRadius: "999px", fontWeight: 700, fontSize: "12px", border: "1px solid rgba(59,130,246,0.25)" }}>
+            {loading ? "Анализ..." : inFlow ? "В сделке" : "Готов"}
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: "8px" }}>
-          {[["signal", "Сигнал"], ["scanner", "AI Сканер"]].map(([tab, label]) => (
+        {/* ── Tabs ── */}
+        <div style={{ display: "flex", gap: "6px" }}>
+          {[["signal", "Сигнал"], ["scanner", "AI Сканер"], ["history", "История"]].map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
-              flex: 1, padding: "11px", borderRadius: "12px", border: "none",
+              flex: 1, padding: "10px 4px", borderRadius: "12px", border: "none",
               background: activeTab === tab ? C.primary : C.card,
-              color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "13px",
-              transition: "all 0.2s",
+              color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "12px",
+              transition: "background 0.2s",
             }}>{label}</button>
           ))}
         </div>
 
-        {/* Asset selector */}
-        <div style={{ background: C.card, borderRadius: "16px", padding: "16px", border: `1px solid ${C.border}` }}>
-          <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px" }}>Актив</div>
-          <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
+        {/* ── Asset selector (shared) ── */}
+        <div style={{ background: C.card, borderRadius: "16px", padding: "14px", border: `1px solid ${C.border}` }}>
+          <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "8px" }}>Актив</div>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap" }}>
             {Object.keys(CATEGORIES).map((cat) => (
-              <button key={cat} onClick={() => setCategory(cat)} style={{
-                padding: "6px 12px", borderRadius: "8px", border: "none",
+              <button key={cat} onClick={() => setCategory(cat)} disabled={inFlow} style={{
+                padding: "5px 10px", borderRadius: "8px",
+                border: category === cat ? "1px solid rgba(59,130,246,0.4)" : `1px solid ${C.border}`,
                 background: category === cat ? "rgba(59,130,246,0.2)" : C.input,
                 color: category === cat ? "#7fb0ff" : C.muted,
-                fontWeight: 600, fontSize: "12px", cursor: "pointer",
-                border: category === cat ? "1px solid rgba(59,130,246,0.4)" : `1px solid ${C.border}`,
-                transition: "all 0.15s",
+                fontWeight: 600, fontSize: "11px", cursor: inFlow ? "default" : "pointer",
+                opacity: inFlow ? 0.5 : 1,
               }}>{cat}</button>
             ))}
           </div>
-          <select
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
-            style={{
-              width: "100%", background: C.input, color: C.text,
-              border: `1px solid ${C.border}`, borderRadius: "10px",
-              padding: "11px 14px", outline: "none", fontSize: "14px",
-              appearance: "none", WebkitAppearance: "none",
-              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 14px center",
-              paddingRight: "36px",
-            }}
-          >
-            {categoryList.map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
+          <select value={symbol} onChange={(e) => setSymbol(e.target.value)} disabled={inFlow} style={{
+            width: "100%", background: C.input, color: C.text,
+            border: `1px solid ${C.border}`, borderRadius: "10px",
+            padding: "10px 14px", outline: "none", fontSize: "14px",
+            opacity: inFlow ? 0.5 : 1,
+          }}>
+            {categoryList.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </div>
 
-        {/* TradingView chart */}
+        {/* ── TradingView chart ── */}
         <TradingViewWidget symbol={tvSymbol} interval={timeframe} />
 
-        {/* Timeframe selector */}
-        <div style={{ background: C.card, borderRadius: "16px", padding: "16px", border: `1px solid ${C.border}` }}>
-          <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px" }}>Таймфрейм</div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            {TIMEFRAMES.map(({ label, value }) => (
-              <button key={value} onClick={() => setTimeframe(value)} style={{
-                flex: 1, padding: "10px 0", borderRadius: "10px",
-                border: timeframe === value ? "1px solid rgba(59,130,246,0.5)" : `1px solid ${C.border}`,
-                background: timeframe === value ? "rgba(59,130,246,0.15)" : C.input,
-                color: timeframe === value ? "#7fb0ff" : C.muted,
-                fontWeight: 700, fontSize: "14px", cursor: "pointer",
-                transition: "all 0.15s",
-              }}>{label}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Mode selector */}
-        <div style={{
-          background: C.card, borderRadius: "16px", padding: "6px",
-          border: `1px solid ${C.border}`, display: "flex", gap: "4px",
-        }}>
-          {MODES.map((m) => (
-            <button key={m} onClick={() => setMode(m)} style={{
-              flex: 1, padding: "10px 8px", borderRadius: "10px", border: "none",
-              background: mode === m ? "rgba(59,130,246,0.18)" : "transparent",
-              color: mode === m ? "#7fb0ff" : C.muted,
-              fontWeight: 700, fontSize: "13px", cursor: "pointer",
-              transition: "all 0.15s",
-            }}>{m}</button>
-          ))}
-        </div>
-
-        {/* === SIGNAL TAB === */}
+        {/* ═══════════════════════════════════════════════════════════════════
+            SIGNAL TAB
+        ════════════════════════════════════════════════════════════════════ */}
         {activeTab === "signal" && (
           <>
-            {/* Session stopped */}
-            {sessionStopped ? (
-              <div style={{
-                background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-                borderRadius: "16px", padding: "20px", textAlign: "center",
-              }}>
-                <div style={{ fontSize: "28px", marginBottom: "8px" }}>🛑</div>
-                <div style={{ color: C.red, fontWeight: 800, fontSize: "16px", marginBottom: "6px" }}>
-                  Стоп-сессия
-                </div>
+            {/* Timeframe */}
+            <div style={{ background: C.card, borderRadius: "16px", padding: "14px", border: `1px solid ${C.border}` }}>
+              <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "8px" }}>Таймфрейм</div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {TIMEFRAMES.map(({ label, value }) => (
+                  <button key={value} onClick={() => setTimeframe(value)} disabled={inFlow} style={{
+                    flex: 1, padding: "10px 0", borderRadius: "10px",
+                    border: timeframe === value ? "1px solid rgba(59,130,246,0.5)" : `1px solid ${C.border}`,
+                    background: timeframe === value ? "rgba(59,130,246,0.15)" : C.input,
+                    color: timeframe === value ? "#7fb0ff" : C.muted,
+                    fontWeight: 700, fontSize: "14px", cursor: inFlow ? "default" : "pointer",
+                    opacity: inFlow ? 0.5 : 1,
+                  }}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mode */}
+            <div style={{ background: C.card, borderRadius: "16px", padding: "6px", border: `1px solid ${C.border}`, display: "flex", gap: "4px" }}>
+              {MODES.map((m) => (
+                <button key={m} onClick={() => setMode(m)} disabled={inFlow} style={{
+                  flex: 1, padding: "10px 8px", borderRadius: "10px", border: "none",
+                  background: mode === m ? "rgba(59,130,246,0.18)" : "transparent",
+                  color: mode === m ? "#7fb0ff" : C.muted,
+                  fontWeight: 700, fontSize: "13px", cursor: inFlow ? "default" : "pointer",
+                  opacity: inFlow ? 0.5 : 1,
+                }}>{m}</button>
+              ))}
+            </div>
+
+            {/* ── STOP SESSION ── */}
+            {sessionStopped && (
+              <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "16px", padding: "24px", textAlign: "center" }}>
+                <div style={{ fontSize: "32px", marginBottom: "8px" }}>🛑</div>
+                <div style={{ color: C.red, fontWeight: 800, fontSize: "16px", marginBottom: "6px" }}>Стоп-сессия</div>
                 <div style={{ color: C.muted, fontSize: "13px", marginBottom: "16px" }}>
                   3 догона не принесли результата. Сделай перерыв и вернись позже.
                 </div>
-                <button onClick={resetSession} style={{
-                  background: C.primary, color: "#fff", border: "none",
-                  borderRadius: "10px", padding: "11px 24px",
-                  fontWeight: 700, fontSize: "14px", cursor: "pointer",
-                }}>
+                <button onClick={resetSession} style={{ background: C.primary, color: "#fff", border: "none", borderRadius: "10px", padding: "11px 24px", fontWeight: 700, fontSize: "14px", cursor: "pointer" }}>
                   Новая сессия
                 </button>
               </div>
-            ) : (
-              <>
-                {/* Win flash */}
-                {winFlash && (
-                  <div style={{
-                    background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)",
-                    borderRadius: "16px", padding: "16px", textAlign: "center",
-                    animation: "fadeIn 0.3s ease",
-                  }}>
-                    <div style={{ fontSize: "32px" }}>🎉</div>
-                    <div style={{ color: C.green, fontWeight: 800, fontSize: "18px", marginTop: "6px" }}>
-                      Выигрыш!
-                    </div>
-                  </div>
-                )}
+            )}
 
-                {/* Signal block */}
-                {signalData && isActive && !winFlash && (
-                  <div style={{
-                    background: signalData.signal === "UP"
-                      ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
-                    border: `1px solid ${sigColor(signalData.signal)}40`,
-                    borderRadius: "16px", padding: "20px",
-                  }}>
-                    {dogonStep > 0 && (
-                      <div style={{
-                        background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.3)",
-                        borderRadius: "8px", padding: "6px 12px", marginBottom: "14px",
-                        color: "#f97316", fontWeight: 700, fontSize: "13px", textAlign: "center",
-                      }}>
-                        ДОГОН {dogonStep}/3
-                      </div>
-                    )}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                      <div>
-                        <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-                          Направление
-                        </div>
-                        <div style={{ color: sigColor(signalData.signal), fontSize: "28px", fontWeight: 900, marginTop: "2px" }}>
-                          {signalData.signal === "UP" ? "ВВЕРХ" : "ВНИЗ"}
-                          {" "}
-                          {signalData.signal === "UP" ? "↑" : "↓"}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-                          Точность
-                        </div>
-                        <div style={{ color: sigColor(signalData.signal), fontSize: "28px", fontWeight: 900, marginTop: "2px" }}>
-                          {signalData.confidence}%
-                        </div>
-                      </div>
-                    </div>
+            {/* ── WIN FLASH ── */}
+            {!sessionStopped && winFlash && (
+              <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)", borderRadius: "16px", padding: "28px", textAlign: "center" }}>
+                <div style={{ fontSize: "44px" }}>🎉</div>
+                <div style={{ color: C.green, fontWeight: 800, fontSize: "22px", marginTop: "8px" }}>Выигрыш!</div>
+              </div>
+            )}
 
-                    {/* Confidence bar */}
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={{ width: "100%", height: "6px", borderRadius: "999px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                        <div style={{
-                          height: "100%", width: signalData.confidence + "%",
-                          borderRadius: "999px",
-                          background: signalData.signal === "UP"
-                            ? `linear-gradient(90deg, ${C.primary}, ${C.green})`
-                            : `linear-gradient(90deg, #f97316, ${C.red})`,
-                          transition: "width 0.5s ease",
-                        }} />
-                      </div>
-                    </div>
+            {/* ── IDLE: get signal button ── */}
+            {!sessionStopped && !winFlash && flowStep === "idle" && (
+              <button onClick={() => fetchSignal(false)} disabled={loading} style={{
+                width: "100%", border: "none",
+                background: loading ? "rgba(59,130,246,0.4)" : "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                color: "#fff", padding: "17px", borderRadius: "16px",
+                fontSize: "15px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer",
+                boxShadow: loading ? "none" : "0 8px 32px rgba(59,130,246,0.3)",
+                opacity: loading ? 0.7 : 1, letterSpacing: "0.5px",
+              }}>
+                {loading ? "АНАЛИЗИРУЮ..." : dogonStep > 0 ? `ДОГОН ${dogonStep}/3 — НОВЫЙ СИГНАЛ` : "ПОЛУЧИТЬ СИГНАЛ"}
+              </button>
+            )}
 
-                    {/* Countdown */}
-                    {signalData.expiry_time && (
-                      <div style={{ marginBottom: "16px" }}>
-                        <CountdownBar
-                          expiryTime={signalData.expiry_time}
-                          timeframeMins={timeframeMins[timeframe] || 1}
-                        />
-                      </div>
-                    )}
+            {/* ── STEP 1: Signal received — confirm or skip ── */}
+            {!sessionStopped && !winFlash && flowStep === "signal" && signalData && (
+              <div>
+                <div style={{
+                  background: activeIsReal
+                    ? (signalData.signal === "UP" ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)")
+                    : C.card,
+                  border: `1px solid ${activeIsReal ? sigColor(signalData.signal) + "40" : C.border}`,
+                  borderRadius: "16px", padding: "20px", marginBottom: "10px",
+                }}>
+                  {dogonStep > 0 && <DogonBadge step={dogonStep} />}
+                  {isScanner && activeIsReal && <ScannerBadge tf={signalData.timeframe || timeframe} />}
 
-                    {/* Entry price */}
-                    {signalData.entry_price && (
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                        <span style={{ color: C.muted, fontSize: "13px" }}>Цена входа</span>
-                        <span style={{ color: C.text, fontSize: "13px", fontWeight: 700 }}>
-                          {Number(signalData.entry_price).toLocaleString("ru-RU", { maximumFractionDigits: 5 })}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Win rate */}
-                    {signalData.win_rate != null && (
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                        <span style={{ color: C.muted, fontSize: "13px" }}>Win Rate</span>
-                        <span style={{ color: C.green, fontSize: "13px", fontWeight: 700 }}>
-                          {signalData.win_rate}%
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Reasons */}
-                    {signalData.reasons?.length > 0 && (
-                      <div style={{
-                        background: C.input, borderRadius: "10px", padding: "12px",
-                        border: `1px solid ${C.border}`, marginBottom: "0",
-                      }}>
-                        <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "8px" }}>
-                          Причины
-                        </div>
-                        {signalData.reasons.map((r, i) => (
-                          <div key={i} style={{ color: "#c8d0e0", fontSize: "12px", lineHeight: "1.5", marginBottom: i < signalData.reasons.length - 1 ? "4px" : 0 }}>
-                            • {r}
+                  {activeIsReal ? (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                        <div>
+                          <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase" }}>Направление</div>
+                          <div style={{ color: sigColor(signalData.signal), fontSize: "30px", fontWeight: 900, marginTop: "2px" }}>
+                            {signalData.signal === "UP" ? "ВВЕРХ ↑" : "ВНИЗ ↓"}
                           </div>
-                        ))}
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase" }}>Точность</div>
+                          <div style={{ color: sigColor(signalData.signal), fontSize: "30px", fontWeight: 900, marginTop: "2px" }}>
+                            {signalData.confidence}%
+                          </div>
+                        </div>
                       </div>
-                    )}
+                      <div style={{ width: "100%", height: "5px", borderRadius: "999px", background: "rgba(255,255,255,0.06)", marginBottom: "14px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: signalData.confidence + "%", borderRadius: "999px", background: signalData.signal === "UP" ? `linear-gradient(90deg, ${C.primary}, ${C.green})` : `linear-gradient(90deg, ${C.orange}, ${C.red})` }} />
+                      </div>
+                      <PriceRow label="📍 Точка входа" value={signalData.entry_price} />
+                      <ReasonsBox reasons={signalData.reasons} />
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ color: C.text, fontWeight: 700, marginBottom: "6px" }}>Результат анализа</div>
+                      <div style={{ color: C.muted, fontSize: "13px" }}>{signalData.reasons?.[0] || signalData.signal}</div>
+                    </>
+                  )}
+                </div>
 
-                    {/* Win/Loss buttons */}
-                    {resultShown && (
-                      <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-                        <button onClick={handleWin} style={{
-                          flex: 1, padding: "14px", borderRadius: "12px", border: "none",
-                          background: "rgba(16,185,129,0.15)",
-                          border: "1px solid rgba(16,185,129,0.4)",
-                          color: C.green, fontWeight: 800, fontSize: "15px", cursor: "pointer",
-                          transition: "all 0.15s",
-                        }}>
-                          Выиграл
-                        </button>
-                        <button onClick={handleLoss} style={{
-                          flex: 1, padding: "14px", borderRadius: "12px", border: "none",
-                          background: "rgba(239,68,68,0.15)",
-                          border: "1px solid rgba(239,68,68,0.4)",
-                          color: C.red, fontWeight: 800, fontSize: "15px", cursor: "pointer",
-                          transition: "all 0.15s",
-                        }}>
-                          Проиграл
-                        </button>
-                      </div>
-                    )}
+                {/* Confirm / Skip */}
+                {activeIsReal ? (
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={handleConfirmEntry} style={{
+                      flex: 2, padding: "15px", borderRadius: "12px",
+                      border: "1px solid rgba(16,185,129,0.4)", background: "rgba(16,185,129,0.15)",
+                      color: C.green, fontWeight: 800, fontSize: "14px", cursor: "pointer",
+                    }}>✅ Я ЗАШЁЛ</button>
+                    <button onClick={handleSkip} style={{
+                      flex: 1, padding: "15px", borderRadius: "12px",
+                      border: `1px solid ${C.border}`, background: C.card,
+                      color: C.muted, fontWeight: 700, fontSize: "14px", cursor: "pointer",
+                    }}>⏭ Пропустить</button>
                   </div>
+                ) : (
+                  <button onClick={() => { setFlowStep("idle"); setSignalData(null); }} style={{
+                    width: "100%", padding: "14px", borderRadius: "12px",
+                    border: `1px solid ${C.border}`, background: C.card,
+                    color: C.muted, fontWeight: 700, fontSize: "14px", cursor: "pointer",
+                  }}>Получить новый сигнал</button>
                 )}
+              </div>
+            )}
 
-                {/* NO SIGNAL result */}
-                {signalData && !isActive && !winFlash && (
-                  <div style={{
-                    background: C.card, border: `1px solid ${C.border}`,
-                    borderRadius: "16px", padding: "18px",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                      <span style={{ color: C.text, fontWeight: 700 }}>Результат анализа</span>
-                      <span style={{
-                        background: "rgba(100,116,139,0.2)", color: C.muted,
-                        padding: "5px 12px", borderRadius: "999px",
-                        fontSize: "12px", fontWeight: 700,
-                      }}>
-                        {signalData.signal}
-                      </span>
+            {/* ── STEP 2: Trade confirmed — timer running ── */}
+            {!sessionStopped && !winFlash && (flowStep === "confirmed" || flowStep === "result_shown") && signalData && (
+              <div style={{
+                background: signalData.signal === "UP" ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+                border: `1px solid ${sigColor(signalData.signal)}40`,
+                borderRadius: "16px", padding: "20px",
+              }}>
+                {dogonStep > 0 && <DogonBadge step={dogonStep} />}
+                {isScanner && <ScannerBadge tf={signalData.timeframe || timeframe} />}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <div>
+                    <div style={{ color: C.muted, fontSize: "11px" }}>Направление</div>
+                    <div style={{ color: sigColor(signalData.signal), fontSize: "26px", fontWeight: 900 }}>
+                      {signalData.signal === "UP" ? "ВВЕРХ ↑" : "ВНИЗ ↓"}
                     </div>
-                    {signalData.reasons?.length > 0 && (
-                      <div style={{ color: C.muted, fontSize: "13px" }}>
-                        {signalData.reasons[0]}
-                      </div>
-                    )}
                   </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ color: C.muted, fontSize: "11px" }}>Точность</div>
+                    <div style={{ color: sigColor(signalData.signal), fontSize: "26px", fontWeight: 900 }}>
+                      {signalData.confidence}%
+                    </div>
+                  </div>
+                </div>
+
+                <PriceRow label="📍 Точка входа" value={signalData.entry_price} />
+                <PriceRow label="⚡ Текущая цена" value={currentPrice} color={C.primary} />
+
+                {flowStep === "confirmed" && signalData.expiry_time && (
+                  <CountdownBar
+                    expiryTime={signalData.expiry_time}
+                    totalMins={activeTFMins}
+                    onExpire={handleTimerExpire}
+                  />
                 )}
 
-                {/* Get signal button */}
-                <button
-                  onClick={() => fetchSignal(false)}
-                  disabled={loading}
-                  style={{
-                    width: "100%", border: "none",
-                    background: loading
-                      ? "rgba(59,130,246,0.4)"
-                      : "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
-                    color: "#fff", padding: "17px", borderRadius: "16px",
-                    fontSize: "15px", fontWeight: 800, cursor: loading ? "not-allowed" : "pointer",
-                    boxShadow: loading ? "none" : "0 8px 32px rgba(59,130,246,0.3)",
-                    transition: "all 0.2s", letterSpacing: "0.5px",
-                    opacity: loading ? 0.7 : 1,
-                  }}
-                >
-                  {loading ? "АНАЛИЗИРУЮ..." : dogonStep > 0 ? `ДОГОН ${dogonStep}/3 — НОВЫЙ СИГНАЛ` : "ПОЛУЧИТЬ СИГНАЛ"}
-                </button>
-              </>
+                {/* ── STEP 3: Timer expired — ask result ── */}
+                {flowStep === "result_shown" && (
+                  <div style={{ marginTop: "16px" }}>
+                    <div style={{ color: C.text, fontWeight: 700, fontSize: "15px", textAlign: "center", marginBottom: "12px" }}>
+                      Сделка закрылась?
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={handleWin} style={{
+                        flex: 1, padding: "15px", borderRadius: "12px",
+                        border: "1px solid rgba(16,185,129,0.4)", background: "rgba(16,185,129,0.15)",
+                        color: C.green, fontWeight: 800, fontSize: "15px", cursor: "pointer",
+                      }}>✅ В ПЛЮСЕ</button>
+                      <button onClick={handleLoss} style={{
+                        flex: 1, padding: "15px", borderRadius: "12px",
+                        border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.15)",
+                        color: C.red, fontWeight: 800, fontSize: "15px", cursor: "pointer",
+                      }}>❌ В МИНУСЕ</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </>
         )}
 
-        {/* === SCANNER TAB === */}
+        {/* ═══════════════════════════════════════════════════════════════════
+            SCANNER TAB
+        ════════════════════════════════════════════════════════════════════ */}
         {activeTab === "scanner" && (
           <>
-            <div style={{
-              background: C.card, border: `1px solid ${C.border}`,
-              borderRadius: "16px", padding: "14px 18px",
-              textAlign: "center", color: C.green,
-              fontWeight: 600, fontSize: "13px",
-            }}>
+            {/* Timeframe + mode */}
+            <div style={{ background: C.card, borderRadius: "16px", padding: "14px", border: `1px solid ${C.border}` }}>
+              <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "8px" }}>Таймфрейм</div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {TIMEFRAMES.map(({ label, value }) => (
+                  <button key={value} onClick={() => setTimeframe(value)} style={{
+                    flex: 1, padding: "9px 0", borderRadius: "10px",
+                    border: timeframe === value ? "1px solid rgba(59,130,246,0.5)" : `1px solid ${C.border}`,
+                    background: timeframe === value ? "rgba(59,130,246,0.15)" : C.input,
+                    color: timeframe === value ? "#7fb0ff" : C.muted,
+                    fontWeight: 700, fontSize: "13px", cursor: "pointer",
+                  }}>{label}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: C.card, borderRadius: "16px", padding: "6px", border: `1px solid ${C.border}`, display: "flex", gap: "4px" }}>
+              {MODES.map((m) => (
+                <button key={m} onClick={() => setMode(m)} style={{
+                  flex: 1, padding: "10px 8px", borderRadius: "10px", border: "none",
+                  background: mode === m ? "rgba(59,130,246,0.18)" : "transparent",
+                  color: mode === m ? "#7fb0ff" : C.muted,
+                  fontWeight: 700, fontSize: "13px", cursor: "pointer",
+                }}>{m}</button>
+              ))}
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "14px 18px", textAlign: "center", color: C.green, fontWeight: 600, fontSize: "13px" }}>
               AI сканер проверит все таймфреймы и выберет лучший вход
             </div>
 
-            <button
-              onClick={fetchScan}
-              disabled={scanLoading}
-              style={{
-                width: "100%", border: "none",
-                background: scanLoading
-                  ? "rgba(59,130,246,0.4)"
-                  : "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
-                color: "#fff", padding: "17px", borderRadius: "16px",
-                fontSize: "15px", fontWeight: 800,
-                cursor: scanLoading ? "not-allowed" : "pointer",
-                opacity: scanLoading ? 0.7 : 1,
-                transition: "all 0.2s", letterSpacing: "0.5px",
-              }}
-            >
+            <button onClick={fetchScan} disabled={scanLoading} style={{
+              width: "100%", border: "none",
+              background: scanLoading ? "rgba(59,130,246,0.4)" : "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+              color: "#fff", padding: "17px", borderRadius: "16px",
+              fontSize: "15px", fontWeight: 800, cursor: scanLoading ? "not-allowed" : "pointer",
+              opacity: scanLoading ? 0.7 : 1, letterSpacing: "0.5px",
+            }}>
               {scanLoading ? "СКАНИРУЮ ТАЙМФРЕЙМЫ..." : "ЗАПУСТИТЬ AI СКАНЕР"}
             </button>
 
             {scanData && (
-              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px" }}>
+              <>
+                {/* Best signal */}
                 {scanData.best ? (
                   <div style={{
-                    background: scanData.best.signal === "UP"
-                      ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+                    background: scanData.best.signal === "UP" ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
                     border: `1px solid ${sigColor(scanData.best.signal)}40`,
-                    borderRadius: "12px", padding: "16px", marginBottom: "16px",
+                    borderRadius: "16px", padding: "18px",
                   }}>
-                    <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>
-                      Лучший вход
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "8px" }}>Лучший вход</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                       <div>
                         <span style={{ fontSize: "24px", fontWeight: 900, color: sigColor(scanData.best.signal) }}>
                           {scanData.best.signal === "UP" ? "ВВЕРХ ↑" : "ВНИЗ ↓"}
                         </span>
-                        <span style={{ fontSize: "16px", marginLeft: "10px", fontWeight: 600, color: C.muted }}>
+                        <span style={{ fontSize: "15px", marginLeft: "10px", fontWeight: 600, color: C.muted }}>
                           {scanData.best.timeframe}
                         </span>
                       </div>
@@ -678,48 +809,113 @@ export default function App() {
                         {scanData.best.confidence}%
                       </span>
                     </div>
-                    <div style={{ color: C.muted, fontSize: "12px", marginTop: "8px", lineHeight: "1.5" }}>
+                    <PriceRow label="📍 Точка входа" value={scanData.best.entry_price} />
+                    <div style={{ color: C.muted, fontSize: "12px", marginBottom: "14px", lineHeight: "1.5" }}>
                       {scanData.reason}
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => handleScannerConfirm(scanData.best)} style={{
+                        flex: 2, padding: "13px", borderRadius: "12px",
+                        border: "1px solid rgba(16,185,129,0.4)", background: "rgba(16,185,129,0.15)",
+                        color: C.green, fontWeight: 800, fontSize: "14px", cursor: "pointer",
+                      }}>✅ Я ЗАШЁЛ</button>
+                      <button onClick={() => setScanData(null)} style={{
+                        flex: 1, padding: "13px", borderRadius: "12px",
+                        border: `1px solid ${C.border}`, background: C.card,
+                        color: C.muted, fontWeight: 700, fontSize: "14px", cursor: "pointer",
+                      }}>⏭ Пропустить</button>
                     </div>
                   </div>
                 ) : (
-                  <div style={{
-                    background: "rgba(100,116,139,0.1)", borderRadius: "12px",
-                    padding: "16px", marginBottom: "16px",
-                    textAlign: "center", color: C.muted, fontSize: "13px",
-                  }}>
+                  <div style={{ background: "rgba(100,116,139,0.1)", borderRadius: "12px", padding: "16px", textAlign: "center", color: C.muted, fontSize: "13px" }}>
                     {scanData.reason}
                   </div>
                 )}
 
-                <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px" }}>
-                  Все таймфреймы
-                </div>
-                {scanData.results.map((item, idx) => (
-                  <div key={idx} style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 0",
-                    borderBottom: idx < scanData.results.length - 1 ? `1px solid ${C.border}` : "none",
-                  }}>
-                    <span style={{
-                      fontWeight: 700, fontSize: "14px",
-                      color: scanData.best?.timeframe === item.timeframe ? sigColor(item.signal) : C.text,
-                    }}>
-                      {item.timeframe}
-                      {scanData.best?.timeframe === item.timeframe && " ★"}
-                    </span>
-                    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: sigColor(item.signal) }}>
-                        {item.signal === "UP" ? "ВВЕРХ" : item.signal === "DOWN" ? "ВНИЗ" : item.signal}
+                {/* All timeframes */}
+                <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "16px" }}>
+                  <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px" }}>Все таймфреймы</div>
+                  {scanData.results.map((item, idx) => (
+                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: idx < scanData.results.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                      <span style={{ fontWeight: 700, fontSize: "14px", color: scanData.best?.timeframe === item.timeframe ? sigColor(item.signal) : C.text }}>
+                        {item.timeframe}{scanData.best?.timeframe === item.timeframe && " ★"}
                       </span>
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: item.confidence > 0 ? sigColor(item.signal) : C.muted }}>
-                        {item.confidence > 0 ? item.confidence + "%" : "--"}
-                      </span>
+                      <div style={{ display: "flex", gap: "12px" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: sigColor(item.signal) }}>
+                          {item.signal === "UP" ? "ВВЕРХ" : item.signal === "DOWN" ? "ВНИЗ" : item.signal}
+                        </span>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: item.confidence > 0 ? sigColor(item.signal) : C.muted }}>
+                          {item.confidence > 0 ? item.confidence + "%" : "--"}
+                        </span>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            HISTORY TAB
+        ════════════════════════════════════════════════════════════════════ */}
+        {activeTab === "history" && (
+          <>
+            {/* Stats */}
+            {historyData?.stats && (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px" }}>
+                <div style={{ color: C.muted, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "12px" }}>
+                  Статистика Win Rate
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", textAlign: "center", marginBottom: "14px" }}>
+                  <div>
+                    <div style={{ color: C.green, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate}%</div>
+                    <div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>Общий</div>
                   </div>
-                ))}
+                  <div>
+                    <div style={{ color: C.primary, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate_manual}%</div>
+                    <div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>Ручной</div>
+                  </div>
+                  <div>
+                    <div style={{ color: C.purple, fontSize: "22px", fontWeight: 800 }}>{historyData.stats.win_rate_ai}%</div>
+                    <div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>AI Сканер</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-around", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.muted, fontSize: "12px" }}>
+                    Всего: <strong style={{ color: C.text }}>{historyData.stats.total}</strong>
+                  </span>
+                  <span style={{ color: C.green, fontSize: "12px" }}>✅ {historyData.stats.wins}</span>
+                  <span style={{ color: C.red,   fontSize: "12px" }}>❌ {historyData.stats.losses}</span>
+                  {historyData.stats.streak > 0 && (
+                    <span style={{ color: historyData.stats.streak_type === "WIN" ? C.green : C.red, fontSize: "12px" }}>
+                      {historyData.stats.streak_type === "WIN" ? "🔥" : "📉"}×{historyData.stats.streak}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
+
+            {/* Trade list */}
+            {historyData?.history?.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {[...historyData.history].reverse().map((trade, idx) => (
+                  <TradeCard key={trade.trade_id || idx} trade={trade} />
+                ))}
+              </div>
+            ) : (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "32px", textAlign: "center", color: C.muted, fontSize: "14px" }}>
+                История пуста. Заходи в сделки — они появятся здесь.
+              </div>
+            )}
+
+            <button onClick={fetchHistory} style={{
+              width: "100%", padding: "12px", borderRadius: "12px",
+              border: `1px solid ${C.border}`, background: C.card,
+              color: C.muted, fontWeight: 600, fontSize: "13px", cursor: "pointer",
+            }}>
+              Обновить
+            </button>
           </>
         )}
 

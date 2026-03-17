@@ -124,6 +124,25 @@ class SignalRequest(BaseModel):
     mode: str | None = "Уверенный"
 
 
+class HistoryAddRequest(BaseModel):
+    trade_id: str
+    signal: str
+    confidence: int
+    symbol: str
+    timeframe: str
+    mode_label: str          # "manual" or "ai_scanner"
+    is_martingale: bool = False
+    martingale_step: int = 0
+    entry_price: float | None = None
+    expiry_time: str | None = None
+    reasons: list[str] = []
+
+
+class HistoryUpdateRequest(BaseModel):
+    trade_id: str
+    result: str              # "WIN" or "LOSS"
+
+
 def load_history() -> list:
     if not os.path.exists(HISTORY_FILE):
         return []
@@ -413,11 +432,80 @@ def root():
 @app.get("/history")
 def get_history():
     history = load_history()
+    finished  = [e for e in history if e.get("result") in ("WIN", "LOSS")]
+    manual_f  = [e for e in finished if e.get("mode") == "manual"]
+    ai_f      = [e for e in finished if e.get("mode") == "ai_scanner"]
+
+    def wr(lst):
+        if not lst:
+            return 0.0
+        wins = sum(1 for e in lst if e["result"] == "WIN")
+        return round(wins / len(lst) * 100, 1)
+
+    streak = 0
+    streak_type = None
+    for e in reversed(finished):
+        if streak_type is None:
+            streak_type = e["result"]
+            streak = 1
+        elif e["result"] == streak_type:
+            streak += 1
+        else:
+            break
+
     return {
-        "history":  history[-20:],
-        "win_rate": calc_win_rate(history),
+        "history":  history[-30:],
+        "win_rate": wr(finished),
         "total":    len(history),
+        "stats": {
+            "win_rate":        wr(finished),
+            "win_rate_manual": wr(manual_f),
+            "win_rate_ai":     wr(ai_f),
+            "total":           len(history),
+            "wins":            sum(1 for e in finished if e["result"] == "WIN"),
+            "losses":          sum(1 for e in finished if e["result"] == "LOSS"),
+            "pending":         sum(1 for e in history if e.get("result") == "PENDING"),
+            "streak":          streak,
+            "streak_type":     streak_type,
+        },
     }
+
+
+@app.post("/history/add")
+def add_history_entry(payload: HistoryAddRequest):
+    history = load_history()
+    history.append({
+        "trade_id":        payload.trade_id,
+        "signal":          payload.signal,
+        "confidence":      payload.confidence,
+        "symbol":          payload.symbol,
+        "timeframe":       payload.timeframe,
+        "mode":            payload.mode_label,
+        "is_martingale":   payload.is_martingale,
+        "martingale_step": payload.martingale_step,
+        "entry_confirmed": True,
+        "entry_price":     payload.entry_price,
+        "result":          "PENDING",
+        "result_confirmed": False,
+        "expiry_time":     payload.expiry_time,
+        "reasons":         payload.reasons,
+        "timestamp":       datetime.now(timezone.utc).isoformat(),
+    })
+    history = history[-100:]
+    save_history(history)
+    return {"ok": True}
+
+
+@app.post("/history/update")
+def update_history_entry(payload: HistoryUpdateRequest):
+    history = load_history()
+    for entry in reversed(history):
+        if entry.get("trade_id") == payload.trade_id:
+            entry["result"] = payload.result
+            entry["result_confirmed"] = True
+            break
+    save_history(history)
+    return {"ok": True}
 
 
 @app.post("/signal")
@@ -439,22 +527,8 @@ def get_signal(payload: SignalRequest):
             "entry_price": None,
         }
 
+    now = datetime.now(timezone.utc)
     history = load_history()
-    history = update_win_rate(history, payload.symbol)
-    history.append({
-        "signal":      result["signal"],
-        "confidence":  result["confidence"],
-        "reasons":     result["reasons"],
-        "state":       result["state"],
-        "entry_price": result.get("entry_price"),
-        "exit_price":  None,
-        "result":      None,
-        "symbol":      payload.symbol,
-        "timeframe":   payload.timeframe,
-        "timestamp":   datetime.utcnow().isoformat(),
-    })
-    history = history[-100:]
-    save_history(history)
 
     return {
         "signal":      result["signal"],
@@ -466,8 +540,8 @@ def get_signal(payload: SignalRequest):
         "timeframe":   payload.timeframe,
         "balance":     payload.balance,
         "mode":        payload.mode,
-        "timestamp":   datetime.utcnow().isoformat(),
-        "expiry_time": (datetime.now(timezone.utc) + timedelta(minutes=TIMEFRAME_MINUTES.get(payload.timeframe, 1))).isoformat(),
+        "timestamp":   now.isoformat(),
+        "expiry_time": (now + timedelta(minutes=TIMEFRAME_MINUTES.get(payload.timeframe, 1))).isoformat(),
         "win_rate":    calc_win_rate(history),
     }
 
@@ -488,11 +562,12 @@ def scan_all_timeframes(payload: SignalRequest):
                 higher_trend = "neutral"
             result = analyze(df, higher_trend, payload.mode or "Уверенный")
             results.append({
-                "timeframe":  tf,
-                "signal":     result["signal"],
-                "confidence": result["confidence"],
-                "reasons":    result["reasons"],
-                "state":      result["state"],
+                "timeframe":   tf,
+                "signal":      result["signal"],
+                "confidence":  result["confidence"],
+                "reasons":     result["reasons"],
+                "state":       result["state"],
+                "entry_price": result.get("entry_price"),
             })
         except Exception as e:
             results.append({
